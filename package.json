@@ -1,0 +1,78 @@
+{
+  "name": "rea-desk",
+  "version": "0.3.0",
+  "description": "REA Desk - acesso remoto simples: receba ajuda ou ajude alguém com um código",
+  "author": "REA Desk",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "server": "node server/server.js",
+    "test": "node server/test.js && node scripts/test-migrations.js && node scripts/test-watchdog.js",
+    "icon": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-icon.ps1",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "dist:dir": "electron-builder --win dir --x64 --publish never",
+    "release": "node scripts/release.js",
+    "update:build-local": "node scripts/build-local.js",
+    "update:serve-local": "node scripts/serve-update.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "koffi": "^3.3.7",
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "semver": "^7.8.6"
+  },
+  "build": {
+    "appId": "br.com.readesk.app",
+    "productName": "REA Desk",
+    "artifactName": "REA-Desk-Instalar-${version}.${ext}",
+    "publish": {
+      "provider": "github",
+      "owner": "PedrooLucca",
+      "repo": "rea-desk",
+      "releaseType": "release"
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "server/server.js",
+      "config/defaults.json",
+      "build/icon.png",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "REA Desk",
+      "deleteAppDataOnUninstall": false,
+      "differentialPackage": true,
+      "language": "1046"
+    }
+  }
+}

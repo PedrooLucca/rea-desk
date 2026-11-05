@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src ws: wss:; media-src 'self' blob: mediastream:; img-src 'self' data:; style-src 'self'; script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REA Desk</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">REA Desk</div>
+  <div id="conn" class="pill off">Conectando…</div>
+  <button id="btnSettings" class="ghost">Configurações</button>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<div id="rollbackBar" class="updatebar warn" hidden>
+  <span id="rollbackText"></span>
+  <span class="spacer"></span>
+  <button id="btnRollbackOk" class="ghost">Entendi</button>
+</div>
+<div id="updateBar" class="updatebar" hidden>
+  <span id="updateText"></span>
+  <progress id="updateProgress" max="100" value="0" hidden></progress>
+  <span class="spacer"></span>
+  <button id="btnUpdateNow">Atualizar agora</button>
+  <button id="btnUpdateLater" class="ghost">Depois</button>
+</div>
+
+<main id="home">
+  <section class="card">
+    <h2>1. Quero receber ajuda</h2>
+    <p class="muted">Diga este código para a pessoa que vai ajudar você:</p>
+    <div class="big" id="myId">---</div>
+    <button id="copyId" class="ghost">Copiar código</button>
+    <p class="hint">Quando a pessoa tentar entrar, aparecerá um aviso e <b>você decide</b> se aceita.
+      Só aceite se você conhece a pessoa e pediu ajuda a ela.</p>
+  </section>
+  <section class="card">
+    <h2>2. Quero ajudar alguém</h2>
+    <p class="muted">Digite o código que a outra pessoa informou:</p>
+    <div class="row">
+      <input id="remoteId" inputmode="numeric" maxlength="11" placeholder="000 000 000" autocomplete="off" aria-label="Código da outra pessoa">
+      <button id="btnConnect">Conectar</button>
+    </div>
+    <div id="homeMsg" class="msg" aria-live="polite"></div>
+  </section>
+  <p id="netNote" class="note" hidden>Os dois computadores precisam estar na mesma rede (mesmo Wi-Fi ou cabo).</p>
+</main>
+
+<main id="session" hidden>
+  <div class="bar">
+    <span id="sessInfo"></span>
+    <span class="spacer"></span>
+    <label class="chk" id="ctlWrap"><input type="checkbox" id="ctlToggle" checked> Usar mouse e teclado</label>
+    <label class="chk" id="curWrap" title="Desmarque para esconder o ponteiro do mouse do outro computador. Ele também deixa de aparecer para quem está lá."><input type="checkbox" id="curToggle" checked> Mostrar o mouse do outro computador</label>
+    <button id="btnRefresh" class="ghost" title="Use se a imagem do outro computador parar de se mexer">Atualizar imagem</button>
+    <button id="btnClipSend" class="ghost" title="Copie um texto neste computador e clique aqui para colar no outro">Copiar texto para lá</button>
+    <button id="btnClipGet" class="ghost" title="Traz o texto copiado no outro computador">Trazer texto de lá</button>
+    <button id="btnFile" class="ghost">Enviar arquivo</button>
+    <button id="btnFull" class="ghost">Tela cheia</button>
+    <button id="btnEnd" class="danger">Encerrar acesso</button>
+    <input id="fileInput" type="file" hidden>
+  </div>
+  <div class="stage">
+    <div class="view" id="viewWrap">
+      <video id="remote" autoplay playsinline muted tabindex="0"></video>
+      <div id="hostNote" class="hostnote" hidden>
+        <div>
+          <p>Seu computador está sendo acessado por <b id="hostPeer"></b>.</p>
+          <p class="sub">Você pode fechar esta janela: o acesso continua. Para parar a qualquer momento, clique no botão abaixo.</p>
+          <p id="cursorNote" class="sub" hidden>O ponteiro do mouse deste computador foi escondido a pedido de quem está acessando.
+            <button id="btnCursorShow" class="ghost">Mostrar meu mouse</button></p>
+          <button id="btnEndHost" class="danger big-btn">Encerrar acesso agora</button>
+        </div>
+      </div>
+      <div id="waiting" class="hostnote" hidden>Conectando… aguarde alguns segundos.</div>
+    </div>
+    <aside class="chat">
+      <div class="chat-title">Conversa</div>
+      <div id="log" class="log"></div>
+      <form id="chatForm" class="row"><input id="chatText" placeholder="Digite uma mensagem" autocomplete="off"><button>Enviar</button></form>
+    </aside>
+  </div>
+</main>
+
+<div id="incoming" class="modal" hidden>
+  <div class="dialog">
+    <h3>Alguém quer acessar seu computador</h3>
+    <p class="who"><b id="inFrom"></b></p>
+    <p class="hint">Só permita se você conhece essa pessoa e pediu ajuda a ela. Desconfie de ligações ou mensagens pedindo para você instalar ou aceitar isto.</p>
+    <label class="chk"><input type="checkbox" id="permCtl" checked> Deixar a pessoa usar meu mouse e teclado</label>
+    <label class="chk"><input type="checkbox" id="permFiles" checked> Deixar a pessoa enviar arquivos e copiar textos</label>
+    <div class="row end"><button id="inDeny" class="ghost">Não permitir</button><button id="inAccept">Permitir</button></div>
+  </div>
+</div>
+
+<div id="welcome" class="modal" hidden>
+  <div class="dialog">
+    <h3>Bem-vindo ao REA Desk</h3>
+    <p>Com este programa você pode <b>receber ajuda</b> de alguém no seu computador, ou <b>ajudar alguém</b> no computador dela.</p>
+    <label>Que nome devemos mostrar para quem se conectar a este computador?
+      <input id="welName" maxlength="40" autocomplete="off">
+    </label>
+    <p class="hint">Se o Windows perguntar sobre permitir acesso à rede, clique em <b>Permitir acesso</b>.</p>
+    <div class="row end"><button id="welOk">Começar</button></div>
+  </div>
+</div>
+
+<div id="settings" class="modal" hidden>
+  <div class="dialog">
+    <h3>Configurações</h3>
+    <label>Nome deste computador
+      <input id="cfgName" maxlength="40" autocomplete="off">
+    </label>
+    <label class="chk"><input type="checkbox" id="cfgAuto"> Abrir o programa junto com o Windows (assim fico pronto para receber ajuda)</label>
+    <div class="updbox">
+      <div class="row"><span id="verText">REA Desk</span><span class="spacer"></span>
+        <button id="btnCheckUpdate" class="ghost">Procurar atualizações</button></div>
+      <div id="updMsg" class="hint" aria-live="polite"></div>
+      <label class="chk"><input type="checkbox" id="cfgSilent" checked> Instalar correções pequenas automaticamente, sem perguntar</label>
+    </div>
+    <details>
+      <summary>Avançado (normalmente não precisa mexer)</summary>
+      <label>Endereço do servidor (deixe em branco para automático)<input id="cfgServer" placeholder="automático"></label>
+      <label>Servidor de apoio para conexões pela internet<input id="cfgStun" placeholder="automático"></label>
+    </details>
+    <p class="hint" id="ver"></p>
+    <div class="row end"><button id="cfgCancel" class="ghost">Cancelar</button><button id="cfgSave">Salvar</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="migrations.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

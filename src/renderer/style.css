@@ -1,0 +1,53 @@
+:root{--bg:#14161a;--panel:#1d2026;--line:#2c313a;--text:#e8eaed;--muted:#9aa0a6;--accent:#ef443b;--ok:#34c759}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.brand{font-weight:700;font-size:16px;letter-spacing:.3px}.brand::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);margin-right:8px}
+.pill{margin-left:auto;padding:2px 10px;border-radius:999px;font-size:12px;border:1px solid var(--line)}
+.pill.on{color:var(--ok);border-color:var(--ok)}.pill.off{color:var(--muted)}
+button{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:8px 14px;font:inherit;cursor:pointer}
+button:hover{filter:brightness(1.1)}button:disabled{opacity:.5;cursor:default}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+button.danger{background:#b3261e}
+input:not([type=checkbox]){background:#0f1115;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px 10px;font:inherit;width:100%}
+input:focus{outline:1px solid var(--accent)}
+#home{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:24px;max-width:960px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px}
+h2{margin:0 0 6px;font-size:16px}.muted{color:var(--muted);margin:0 0 14px}
+.big{font:600 34px/1.2 Consolas,monospace;letter-spacing:2px;margin:8px 0 14px}
+.row{display:flex;gap:8px;align-items:center}.row.end{justify-content:flex-end;margin-top:14px}
+.spacer{flex:1}
+#session{display:flex;flex-direction:column;height:calc(100% - 49px)}
+.bar{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.chk{display:flex;gap:6px;align-items:center;color:var(--text);margin:6px 0}
+.stage{flex:1;display:flex;min-height:0}
+.view{flex:1;position:relative;background:#000;min-width:0}
+video{width:100%;height:100%;object-fit:contain;outline:none;cursor:crosshair}
+.hostnote{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;background:rgba(0,0,0,.65);font-size:18px;padding:24px}
+.chat{width:260px;border-left:1px solid var(--line);display:flex;flex-direction:column;padding:8px;gap:8px;background:var(--panel)}
+.log{flex:1;overflow:auto;font-size:13px}.log div{margin:3px 0;word-break:break-word}.log .me{color:#8ab4f8}.log .sys{color:var(--muted);font-style:italic}
+[hidden]{display:none!important}
+.hint{color:var(--muted);font-size:13px;margin:14px 0 0}
+.msg{margin-top:12px;min-height:20px;color:#ffb4ab}.msg.ok{color:var(--muted)}
+.note{grid-column:1/-1;text-align:center;color:var(--muted);margin:0}
+.banner{background:#4a2b00;border-bottom:1px solid #8a5200;color:#ffd9a0;padding:10px 16px;text-align:center}
+.who{font-size:18px;margin:6px 0}
+.big-btn{font-size:16px;padding:12px 22px;margin-top:6px}
+.hostnote .sub{font-size:14px;color:#ccc}
+.chat-title{font-weight:600}
+.updatebar{display:flex;gap:10px;align-items:center;padding:8px 16px;background:#17304a;border-bottom:1px solid #27527d;color:#cfe4ff;font-size:14px;flex-wrap:wrap}
+.updatebar.warn{background:#4a2b00;border-color:#8a5200;color:#ffd9a0}
+.updatebar button{padding:5px 12px}
+progress{width:160px;height:8px;accent-color:#4da3ff}
+.updbox{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.updbox .hint{margin:6px 0 0;min-height:18px}
+details{margin-top:12px}summary{cursor:pointer;color:var(--muted)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid #fff;outline-offset:2px}
+body{font-size:15px}
+.big{font-size:40px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10}
+.dialog{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;width:420px;max-width:92vw}
+.dialog h3{margin:0 0 10px}.dialog label{display:block;margin:10px 0 0}.dialog label input{margin-top:4px}
+.dialog .chk{display:flex}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b2f37;border:1px solid var(--line);padding:10px 16px;border-radius:8px;z-index:20}
+@media(max-width:760px){#home{grid-template-columns:1fr}.chat{display:none}}

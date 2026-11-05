@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-local/
+.local-build/
+.claude/
+
+# análise local do AnyDesk instalado neste PC (não publicar)
+docs/rea-analysis/
