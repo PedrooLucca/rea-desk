@@ -55,6 +55,7 @@
     <span id="sessInfo"></span>
     <span class="spacer"></span>
     <label class="chk" id="ctlWrap"><input type="checkbox" id="ctlToggle" checked> Usar mouse e teclado</label>
+    <span id="monPick" class="monpick" hidden></span>
     <label class="chk" id="curWrap" title="Desmarque para esconder o ponteiro do mouse do outro computador. Ele também deixa de aparecer para quem está lá."><input type="checkbox" id="curToggle" checked> Mostrar o mouse do outro computador</label>
     <button id="btnRefresh" class="ghost" title="Use se a imagem do outro computador parar de se mexer">Atualizar imagem</button>
     <button id="btnClipSend" class="ghost" title="Copie um texto neste computador e clique aqui para colar no outro">Copiar texto para lá</button>
@@ -71,6 +72,7 @@
         <div>
           <p>Seu computador está sendo acessado por <b id="hostPeer"></b>.</p>
           <p class="sub">Você pode fechar esta janela: o acesso continua. Para parar a qualquer momento, clique no botão abaixo.</p>
+          <p id="monNote" class="sub" hidden>Quem está acessando está vendo o <b>monitor <span id="monNum"></span></b> deste computador.</p>
           <p id="cursorNote" class="sub" hidden>O ponteiro do mouse deste computador foi escondido a pedido de quem está acessando.
             <button id="btnCursorShow" class="ghost">Mostrar meu mouse</button></p>
           <button id="btnEndHost" class="danger big-btn">Encerrar acesso agora</button>

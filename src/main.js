@@ -1,7 +1,7 @@
 'use strict';
 const {
   app, BrowserWindow, ipcMain, session, desktopCapturer, clipboard, shell, Tray, Menu, nativeImage, powerSaveBlocker,
-  utilityProcess, MessageChannelMain,
+  utilityProcess, MessageChannelMain, screen,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -9,6 +9,7 @@ const os = require('node:os');
 const input = require('./input');
 const net = require('./net');
 const updater = require('./updater');
+const monitors = require('./monitors');
 const defaults = require('../config/defaults.json');
 
 // Janela minimizada/coberta não pode reduzir a prioridade do vídeo nem das conexões:
@@ -41,6 +42,49 @@ function showWindow() {
   win.focus();
 }
 
+/* ---------- Vários monitores ---------- */
+// O processo principal é o dono da lista de monitores e de qual está selecionado (é quem enxerga `screen` e
+// `desktopCapturer`). A lógica pura fica em src/monitors.js. Tudo em pixels FÍSICOS da área de trabalho virtual.
+let monitorList = [], selectedMonitor = null, monitorRev = 0, monitorTimer = null;
+
+function readDisplays() {
+  // SÓ PARA TESTES: REA_TEST_MONITORS_FILE aponta para um JSON com a lista de monitores simulada (hot-plug sem hardware).
+  if (process.env.REA_TEST_MONITORS_FILE) {
+    try { return JSON.parse(fs.readFileSync(process.env.REA_TEST_MONITORS_FILE, 'utf8').replace(/^﻿/, '')); } catch {}
+  }
+  const primaryId = screen.getPrimaryDisplay().id;
+  return screen.getAllDisplays().map((d) => {
+    let r = d.bounds;                                           // em DIP; converte para pixels físicos (Windows)
+    try { r = screen.dipToScreenRect(null, d.bounds); } catch {}
+    return { id: d.id, x: r.x, y: r.y, width: r.width, height: r.height, scaleFactor: d.scaleFactor, rotation: d.rotation, primary: d.id === primaryId, label: d.label };
+  });
+}
+const monitorsState = () => ({ list: monitors.publicList(monitorList), selected: selectedMonitor, rev: monitorRev });
+// A topologia também vai para o injetor de mouse, que a usa para mapear cliques no monitor certo.
+function pushTopology() {
+  const msg = { k: 'topology', monitors: monitorList.map(({ id, x, y, w, h }) => ({ id, x, y, w, h })), selected: selectedMonitor };
+  try { input.handle(msg); } catch {}
+  try { injector?.postMessage(msg); } catch {}
+}
+function refreshMonitors(notify) {
+  let next;
+  try { next = monitors.buildMonitors(readDisplays()); } catch (err) { console.error('monitores:', err.message); return; }
+  if (!next.length) return;                                       // nunca fica sem monitores (ex.: tela desligando por instantes)
+  const plan = monitors.planUpdate(monitorList, selectedMonitor, next);
+  monitorList = next; selectedMonitor = plan.selected;
+  if (plan.topologyChanged || monitorRev === 0) monitorRev++;
+  pushTopology();
+  if (notify && plan.topologyChanged) win?.webContents.send('monitors-changed', { ...monitorsState(), recapture: plan.recapture, selectionLost: plan.selectionLost });
+}
+// Escolhe a fonte de captura do monitor selecionado (captura SÓ ele: economiza banda e CPU).
+async function pickScreenSource() {
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
+  const byId = sources.find((s) => s.display_id && String(s.display_id) === String(selectedMonitor));
+  if (byId) return byId;
+  const idx = monitorList.findIndex((m) => m.id === String(selectedMonitor));   // plano B: mesma ordem da lista de monitores
+  return sources[idx] || sources[0];
+}
+
 // Injeção de mouse/teclado em processo separado (veja src/injector.js).
 let injector = null;
 function startInjector() {
@@ -48,6 +92,7 @@ function startInjector() {
     injector = utilityProcess.fork(path.join(__dirname, 'injector.js'), [], { serviceName: 'REA Desk entrada' });
     const me = injector;
     me.on('exit', () => { restoreCursorSafely(); if (injector === me) { injector = null; if (!quitting) setTimeout(() => { startInjector(); wireInputPort(); }, 500); } });
+    pushTopology();
   } catch (err) { console.error('injector:', err.message); injector = null; }
 }
 function wireInputPort() {
@@ -116,15 +161,31 @@ function createTray() {
 }
 
 app.whenReady().then(() => {
-  // getDisplayMedia sem seletor: compartilha a tela principal (a pessoa já aceitou o pedido na tela).
+  // getDisplayMedia sem seletor: compartilha o monitor selecionado (por padrão o principal); a pessoa já aceitou o pedido na tela.
   session.defaultSession.setDisplayMediaRequestHandler(
     (_req, cb) => {
-      desktopCapturer.getSources({ types: ['screen'] })
-        .then((s) => cb(s[0] ? { video: s[0] } : {}))
+      pickScreenSource()
+        .then((s) => cb(s ? { video: s } : {}))
         .catch(() => cb({}));
     },
     { useSystemPicker: false },
   );
+  refreshMonitors(false);
+  // monitor conectado/desconectado, mudança de resolução, orientação ou escala: espera 300 ms (o Windows dispara vários eventos)
+  const onTopology = () => { clearTimeout(monitorTimer); monitorTimer = setTimeout(() => refreshMonitors(true), 300); };
+  for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(ev, onTopology);
+  if (process.env.REA_TEST_MONITORS_FILE) fs.watchFile(process.env.REA_TEST_MONITORS_FILE, { interval: 200 }, onTopology);   // só testes
+  ipcMain.handle('monitors-get', (_e, reset) => {
+    refreshMonitors(false);
+    if (reset) { const p = monitors.primaryOf(monitorList); if (p) { selectedMonitor = p.id; pushTopology(); } }   // cada sessão começa no monitor principal
+    return monitorsState();
+  });
+  ipcMain.handle('monitor-select', (_e, id) => {
+    const ok = monitorList.some((m) => m.id === String(id));
+    const changed = ok && selectedMonitor !== String(id);
+    if (ok) { selectedMonitor = String(id); pushTopology(); }
+    return { ...monitorsState(), ok, changed };
+  });
   session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'display-capture' || perm === 'media'));
 
   ipcMain.on('input', (_e, ev) => { try { input.handle(ev); } catch (err) { console.error('input:', err.message); } });

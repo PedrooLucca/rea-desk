@@ -35,6 +35,10 @@ video{width:100%;height:100%;object-fit:contain;outline:none;cursor:crosshair}
 .big-btn{font-size:16px;padding:12px 22px;margin-top:6px}
 .hostnote .sub{font-size:14px;color:#ccc}
 .chat-title{font-weight:600}
+.monpick{display:flex;gap:4px;align-items:center}.monpick[hidden]{display:none}
+.monlabel{color:var(--muted);margin-right:2px}
+.monpick button{padding:6px 11px;min-width:34px}
+.monpick button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .updatebar{display:flex;gap:10px;align-items:center;padding:8px 16px;background:#17304a;border-bottom:1px solid #27527d;color:#cfe4ff;font-size:14px;flex-wrap:wrap}
 .updatebar.warn{background:#4a2b00;border-color:#8a5200;color:#ffd9a0}
 .updatebar button{padding:5px 12px}

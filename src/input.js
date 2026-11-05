@@ -74,6 +74,11 @@ function hideCursor(hide) {
   cursorHidden = true;
 }
 
+// Topologia dos monitores (enviada pelo processo principal). Sem ela, vale o comportamento antigo (só o monitor principal).
+const monitors = require('./monitors');
+const VIRTUALDESK = 0x4000;
+let topology = null;
+
 const BUTTONS = [[M.LDOWN, M.LUP], [M.MDOWN, M.MUP], [M.RDOWN, M.RUP]]; // button 0,1,2 do DOM
 const clamp01 = (n) => Math.min(1, Math.max(0, Number(n) || 0));
 const pressedKeys = new Set();
@@ -83,10 +88,18 @@ function handle(ev) {
   if (!ev || typeof ev !== 'object') return;
   if (ev.k === 'release') return releaseAll();
   if (ev.k === 'cursor') return hideCursor(!ev.show);
+  if (ev.k === 'topology') { topology = Array.isArray(ev.monitors) && ev.monitors.length ? { monitors: ev.monitors, selected: ev.selected } : null; return; }
   if (ev.k === 'mouse') {
-    const x = Math.round(clamp01(ev.x) * 65535);
-    const y = Math.round(clamp01(ev.y) * 65535);
-    const pos = M.MOVE | M.ABSOLUTE;
+    let x, y, pos;
+    if (ev.type !== 'wheel') {
+      if (topology) {                                   // vários monitores: mapeia para a área de trabalho virtual
+        const a = monitors.mapMouse(topology, ev);
+        if (!a) return;                                 // o monitor que o controlador via não existe mais: descarta (não clica no lugar errado)
+        x = a.x; y = a.y; pos = M.MOVE | M.ABSOLUTE | VIRTUALDESK;
+      } else {                                          // sem topologia: comportamento antigo (monitor principal)
+        x = Math.round(clamp01(ev.x) * 65535); y = Math.round(clamp01(ev.y) * 65535); pos = M.MOVE | M.ABSOLUTE;
+      }
+    }
     if (ev.type === 'move') return sendMouse(pos, x, y);
     if (ev.type === 'down' || ev.type === 'up') {
       const pair = BUTTONS[ev.button];

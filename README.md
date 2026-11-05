@@ -30,6 +30,27 @@ baixa só o que mudou, mostra "Nova versão disponível. Atualizar agora ou depo
 instala sem pedir administrador, mantém os dados do usuário, e faz **rollback automático** se a versão nova não abrir.
 Como lançar versões e como testar localmente: **[LANCAR-VERSAO.md](LANCAR-VERSAO.md)** (um comando: `npm run release -- patch`).
 
+## Vários monitores
+
+Se o computador controlado tem mais de um monitor, a barra de quem controla mostra **Monitor: 1 2 …**. Clicar em um número troca a
+imagem na hora, **sem reconectar**, e o mouse passa a ser mapeado para aquele monitor (deslocamentos, coordenadas negativas,
+resoluções e escalas de DPI diferentes). Só o monitor escolhido é capturado (menos banda e CPU). Com um único monitor nada aparece e
+tudo funciona como antes. Se um monitor for conectado/desconectado ou mudar de resolução/orientação durante o acesso, a lista é
+atualizada, e se o monitor que estava sendo visto sumir o programa volta ao principal e avisa.
+
+Como funciona (código em `src/monitors.js`, `src/main.js`, `src/input.js`, `src/renderer/renderer.js`):
+- O processo principal lê os monitores (`screen`), converte para **pixels físicos** da área de trabalho virtual e guarda qual está selecionado
+  (cada sessão começa no principal). A captura (`desktopCapturer`) usa só esse monitor; ao trocar, o computador controlado captura de novo e
+  usa `replaceTrack` (sem renegociar o WebRTC).
+- Protocolo (estende o canal de dados existente; mensagens desconhecidas são ignoradas, então versões antigas seguem funcionando):
+  `host → controlador {k:'monitors', list:[{id,index,x,y,w,h,scale,rotation,primary}], selected, rev, reason?}`;
+  `controlador → host {k:'monitor', id}`; as mensagens de mouse ganham `mon` (o monitor que o controlador estava vendo).
+  Sem `mon` (cliente antigo) vale o monitor selecionado; com `mon` de um monitor que não existe mais, o evento é descartado.
+- O injetor converte o ponto do monitor para o `SendInput` com `MOUSEEVENTF_VIRTUALDESK`.
+- Testes: `npm test` (lógica de coordenadas, seleção e hot-plug em `scripts/test-monitors.js`). `REA_TEST_MONITORS_FILE` (só testes) permite simular
+  a lista de monitores por um arquivo JSON.
+- **Ainda não existe** a visão combinada "todos os monitores" (decisão de escopo); o protocolo reserva espaço para ela.
+
 ## Como a conexão funciona (sem configurar nada)
 
 - **Mesma rede (Wi-Fi/cabo):** funciona de imediato. O primeiro computador que abre vira o "ponto de encontro" e os
@@ -56,7 +77,8 @@ Como lançar versões e como testar localmente: **[LANCAR-VERSAO.md](LANCAR-VERS
 
 ## Limitações restantes
 
-- **Windows apenas** (injeção de mouse/teclado via `SendInput`). Só a tela principal é compartilhada. Sem áudio.
+- **Windows apenas** (injeção de mouse/teclado via `SendInput`). Um monitor por vez (ainda sem a visão combinada de todos). Sem áudio.
+- **Vários monitores:** testado com 2 monitores reais iguais (1920×1080), com topologias simuladas e com hot-plug real (desligar e religar o monitor 2 pelo Windows). **DPIs diferentes e troca de orientação com hardware real ainda não foram testados** (o cálculo está coberto por testes unitários).
 - **Assinatura de código:** sem certificado, o SmartScreen avisa na primeira execução. Para remover o aviso é preciso
   comprar um certificado de assinatura e configurá-lo no electron-builder. Em computadores com "Controle de Aplicativo
   inteligente"/políticas de aplicativos ativas, um `.exe` novo e não assinado pode ser **bloqueado** pelo Windows

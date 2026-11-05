@@ -156,6 +156,7 @@ function preparePC() {
 async function startHost() {
   preparePC();
   showSession(false);
+  try { monState = await window.rea.monitors.get(true); } catch {}      // cada sessão começa no monitor principal
   try {
     localStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
   } catch {
@@ -191,7 +192,7 @@ async function onRtc(d) {
 function setupDC() {
   dc.binaryType = 'arraybuffer';
   dc.bufferedAmountLowThreshold = 1 << 20;
-  dc.onopen = () => log('Conexão segura estabelecida.', 'sys');
+  dc.onopen = () => { log('Conexão segura estabelecida.', 'sys'); if (role === 'host') hostSendMonitors(); };
   dc.onmessage = (e) => {
     if (typeof e.data !== 'string') return onFileChunk(e.data);
     let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -208,6 +209,12 @@ async function onDC(m) {
       if (role === 'host') window.rea.releaseInput(); break;
     case 'refresh': // o controlador pediu uma imagem nova (a anterior parou)
       if (role === 'host') refreshHostVideo(); break;
+    case 'monitor': // o controlador escolheu outro monitor para ver (só o host reage; clientes antigos nem enviam isto)
+      if (role === 'host') hostSwitchMonitor(String(m.id));
+      break;
+    case 'monitors': // o host informa a lista de monitores e qual está sendo transmitido (hosts antigos nunca enviam)
+      if (role === 'controller') onMonitors(m);
+      break;
     case 'cursor': // o controlador pediu para mostrar/esconder o ponteiro do mouse deste computador
       if (role === 'host' && perms.control) setHostCursor(!!m.show);
       break;
@@ -301,6 +308,8 @@ function reset() {
   localStream?.getTracks().forEach((t) => t.stop());
   $('#remote').srcObject = null;
   pc = dc = localStream = null; peerId = role = null; peerName = ''; rx = null;
+  monState = { list: [], selected: null, rev: 0 }; viewMon = null; pendingSelect = null;
+  $('#monPick').hidden = true; $('#monPick').textContent = ''; $('#monNote').hidden = true;
   perms = { control: false, files: false };
   pendingIce = []; hasRemote = false;
   $('#session').hidden = true; $('#home').hidden = false; $('#log').textContent = '';
@@ -326,18 +335,18 @@ let lastMove = 0;
 video.addEventListener('mousemove', (e) => {
   if (!controlling()) return;
   const now = performance.now(); if (now - lastMove < 16) return; lastMove = now;
-  const p = norm(e); if (p) dsend({ k: 'mouse', type: 'move', ...p });
+  const p = norm(e); if (p) dsend({ k: 'mouse', type: 'move', mon: viewMon, ...p });
 });
 for (const type of ['down', 'up']) {
   video.addEventListener('mouse' + type, (e) => {
     if (!controlling()) return;
     video.focus(); e.preventDefault();
-    const p = norm(e); if (p) dsend({ k: 'mouse', type, button: e.button, ...p });
+    const p = norm(e); if (p) dsend({ k: 'mouse', type, button: e.button, mon: viewMon, ...p });
   });
 }
 video.addEventListener('wheel', (e) => {
   if (!controlling()) return; e.preventDefault();
-  const p = norm(e); if (p) dsend({ k: 'mouse', type: 'wheel', dy: e.deltaMode === 0 ? e.deltaY : e.deltaY * 40, ...p });
+  const p = norm(e); if (p) dsend({ k: 'mouse', type: 'wheel', mon: viewMon, dy: e.deltaMode === 0 ? e.deltaY : e.deltaY * 40, ...p });
 }, { passive: false });
 video.addEventListener('contextmenu', (e) => e.preventDefault());
 for (const down of [true, false]) {
@@ -351,6 +360,88 @@ for (const down of [true, false]) {
 const releaseRemote = () => { if (role === 'controller') dsend({ k: 'release' }); };
 window.addEventListener('blur', releaseRemote);
 video.addEventListener('blur', releaseRemote);
+
+/* ---------- Vários monitores ---------- */
+// Protocolo (estende o canal de dados existente; mensagens desconhecidas são ignoradas, então versões antigas seguem funcionando):
+//   host -> controlador  { k:'monitors', list:[{id,index,x,y,w,h,scale,rotation,primary}], selected, rev, reason? }
+//   controlador -> host  { k:'monitor', id }
+//   controlador -> host  mensagens de mouse ganham `mon` = monitor que o controlador estava vendo
+let monState = { list: [], selected: null, rev: 0 };   // host: vem do processo principal; controlador: vem do host
+let viewMon = null;                                     // controlador: monitor que está na tela
+let switching = null, pendingSelect = null;             // host: troca em andamento / pedido que chegou durante a troca
+
+// Host: captura de novo o monitor selecionado e troca a faixa de vídeo SEM renegociar (replaceTrack).
+async function applyCapture() {
+  const next = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+  const snd = pc && pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+  if (!snd) { next.getTracks().forEach((t) => t.stop()); throw new Error('sem faixa de vídeo para trocar'); }
+  const old = localStream;
+  await snd.replaceTrack(next.getVideoTracks()[0]);
+  localStream = next;
+  old?.getTracks().forEach((t) => t.stop());
+}
+function hostSendMonitors(extra = {}) {
+  if (role !== 'host') return;
+  dsend({ k: 'monitors', list: monState.list, selected: monState.selected, rev: monState.rev, ...extra });
+  const idx = (monState.list.find((m) => m.id === monState.selected) || {}).index;
+  $('#monNote').hidden = !(monState.list.length > 1 && idx);
+  if (idx) $('#monNum').textContent = String(idx);
+}
+async function hostSwitchMonitor(id) {
+  if (role !== 'host') return;
+  if (switching) { pendingSelect = id; return; }                      // já trocando: guarda o último pedido
+  switching = (async () => {
+    let target = id;
+    for (;;) {
+      const r = await window.rea.monitors.select(target);
+      monState = { list: r.list, selected: r.selected, rev: r.rev };
+      if (r.changed) {
+        try { await applyCapture(); }
+        catch (err) { console.error('troca de monitor', err); toast('Não foi possível trocar o monitor agora. Tente de novo.'); }
+      }
+      hostSendMonitors();
+      if (pendingSelect == null) break;
+      target = pendingSelect; pendingSelect = null;
+    }
+  })().finally(() => { switching = null; });
+  return switching;
+}
+// Host: monitor conectado/desconectado ou mudança de resolução/orientação/escala durante a sessão.
+window.rea.monitors.onChanged(async (s) => {
+  monState = { list: s.list, selected: s.selected, rev: s.rev };
+  if (role !== 'host' || !pc) return;
+  if (switching) await switching.catch(() => {});
+  if (s.recapture) {                                                  // o monitor transmitido mudou ou sumiu
+    try { await applyCapture(); } catch (err) { console.error('recaptura', err); toast('A tela mudou e não foi possível atualizar a imagem. Use "Atualizar imagem".'); }
+  }
+  hostSendMonitors({ reason: s.selectionLost ? 'lost' : 'changed' });
+});
+
+// Controlador: recebe a lista e mostra os botões de monitor (só aparecem se houver mais de um).
+function onMonitors(m) {
+  if (!Array.isArray(m.list)) return;
+  monState = { list: m.list, selected: m.selected == null ? null : String(m.selected), rev: m.rev || 0 };
+  viewMon = monState.selected;
+  renderMonitors();
+  if (m.reason === 'lost') toast('O monitor que você estava vendo foi desconectado. Agora você vê o monitor principal.', 6000);
+  else if (m.reason === 'changed') toast('A configuração dos monitores do outro computador mudou.', 4000);
+}
+function renderMonitors() {
+  const box = $('#monPick'), list = monState.list;
+  box.hidden = list.length < 2;
+  if (box.hidden) { box.textContent = ''; return; }
+  box.textContent = '';
+  const lab = document.createElement('span'); lab.className = 'monlabel'; lab.textContent = 'Monitor:'; box.append(lab);
+  for (const m of list) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ghost' + (m.id === monState.selected ? ' on' : '');
+    b.textContent = String(m.index);
+    b.title = `Monitor ${m.index}: ${m.w}×${m.h}${m.primary ? ' (principal)' : ''}`;
+    b.setAttribute('aria-pressed', m.id === monState.selected ? 'true' : 'false');
+    b.onclick = () => { if (m.id !== monState.selected) dsend({ k: 'monitor', id: m.id }); };
+    box.append(b);
+  }
+}
 
 /* ---------- Mostrar / esconder o mouse do computador controlado ---------- */
 // O ponteiro vai embutido na imagem e não dá para tirá-lo só do vídeo; então ele é escondido no próprio computador
