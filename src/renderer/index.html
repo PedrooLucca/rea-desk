@@ -46,6 +46,11 @@
       <button id="btnConnect">Conectar</button>
     </div>
     <div id="homeMsg" class="msg" aria-live="polite"></div>
+    <div class="hist">
+      <div class="hist-head"><span>Computadores recentes</span><button id="histClear" class="linkbtn" hidden>Limpar</button></div>
+      <ul id="histList" class="hist-list"></ul>
+      <p id="histEmpty" class="hint">Os computadores que você acessar aparecerão aqui, para conectar com um clique.</p>
+    </div>
   </section>
   <p id="netNote" class="note" hidden>Os dois computadores precisam estar na mesma rede (mesmo Wi-Fi ou cabo).</p>
 </main>
@@ -56,11 +61,15 @@
     <span class="spacer"></span>
     <label class="chk" id="ctlWrap"><input type="checkbox" id="ctlToggle" checked> Usar mouse e teclado</label>
     <span id="monPick" class="monpick" hidden></span>
+    <button id="btnPopout" class="ghost" hidden title="Abre outra janela mostrando outro monitor do computador que você está acessando">Outro monitor em nova janela</button>
     <label class="chk" id="curWrap" title="Desmarque para esconder o ponteiro do mouse do outro computador. Ele também deixa de aparecer para quem está lá."><input type="checkbox" id="curToggle" checked> Mostrar o mouse do outro computador</label>
     <button id="btnRefresh" class="ghost" title="Use se a imagem do outro computador parar de se mexer">Atualizar imagem</button>
     <button id="btnClipSend" class="ghost" title="Copie um texto neste computador e clique aqui para colar no outro">Copiar texto para lá</button>
     <button id="btnClipGet" class="ghost" title="Traz o texto copiado no outro computador">Trazer texto de lá</button>
     <button id="btnFile" class="ghost">Enviar arquivo</button>
+    <button id="btnFit" class="ghost" title="Ajusta o tamanho desta janela ao tamanho da tela do outro computador">Ajustar janela</button>
+    <button id="btnView" class="ghost">Exibição: reduzida</button>
+    <button id="btnChat" class="ghost" aria-pressed="true" title="Esconde ou mostra a conversa para ver mais da tela do outro computador"><span id="chatBtnText">Ocultar conversa</span><span id="chatBadge" class="badge" hidden></span></button>
     <button id="btnFull" class="ghost">Tela cheia</button>
     <button id="btnEnd" class="danger">Encerrar acesso</button>
     <input id="fileInput" type="file" hidden>
@@ -72,7 +81,7 @@
         <div>
           <p>Seu computador está sendo acessado por <b id="hostPeer"></b>.</p>
           <p class="sub">Você pode fechar esta janela: o acesso continua. Para parar a qualquer momento, clique no botão abaixo.</p>
-          <p id="monNote" class="sub" hidden>Quem está acessando está vendo o <b>monitor <span id="monNum"></span></b> deste computador.</p>
+          <p id="monNote" class="sub" hidden>Quem está acessando está vendo o(s) <b>monitor(es) <span id="monNum"></span></b> deste computador.</p>
           <p id="cursorNote" class="sub" hidden>O ponteiro do mouse deste computador foi escondido a pedido de quem está acessando.
             <button id="btnCursorShow" class="ghost">Mostrar meu mouse</button></p>
           <button id="btnEndHost" class="danger big-btn">Encerrar acesso agora</button>
@@ -118,6 +127,7 @@
       <input id="cfgName" maxlength="40" autocomplete="off">
     </label>
     <label class="chk"><input type="checkbox" id="cfgAuto"> Abrir o programa junto com o Windows (assim fico pronto para receber ajuda)</label>
+    <label class="chk"><input type="checkbox" id="cfgAutoFit" checked> Ajustar o tamanho da janela ao da tela do outro computador ao conectar</label>
     <div class="updbox">
       <div class="row"><span id="verText">REA Desk</span><span class="spacer"></span>
         <button id="btnCheckUpdate" class="ghost">Procurar atualizações</button></div>
@@ -136,6 +146,8 @@
 
 <div id="toast" class="toast" hidden></div>
 <script src="migrations.js"></script>
+<script src="history.js"></script>
+<script src="viewmode.js"></script>
 <script src="renderer.js"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "server": "node server/server.js",
-    "test": "node server/test.js && node scripts/test-migrations.js && node scripts/test-watchdog.js && node scripts/test-monitors.js",
+    "test": "node server/test.js && node scripts/test-migrations.js && node scripts/test-watchdog.js && node scripts/test-monitors.js && node scripts/test-history.js && node scripts/test-viewmode.js",
     "icon": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-icon.ps1",
     "dist": "electron-builder --win nsis --x64 --publish never",
     "dist:dir": "electron-builder --win dir --x64 --publish never",

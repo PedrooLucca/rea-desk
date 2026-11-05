@@ -5,8 +5,11 @@ const MAX_FILE = 200 * 1024 * 1024;
 
 const store = {
   get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
-  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} flushSoon(); },
 };
+// grava em disco logo depois de qualquer mudança (agrupa várias mudanças seguidas)
+let flushTimer = null;
+function flushSoon() { clearTimeout(flushTimer); flushTimer = setTimeout(() => { try { window.rea.flushStorage(); } catch {} }, 250); }
 try { window.REA_MIGRATIONS.run(localStorage); } catch {}   // ajusta dados de versões anteriores (nunca apaga nada)
 const cfg = {
   server: store.get('server', ''),   // vazio = automático
@@ -86,7 +89,7 @@ function onSignal(m) {
       myId = m.id; store.set('myId', myId); $('#myId').textContent = fmtId(myId); break;
     case 'error':
       clearTimeout(callTimer);
-      peerId = role = null; $('#btnConnect').disabled = false;
+      peerId = role = null; $('#btnConnect').disabled = false; setHistBusy(false);
       homeMsg('Não encontramos esse código. Confira se digitou certo e se o programa está aberto no outro computador.');
       break;
     case 'incoming':
@@ -106,6 +109,8 @@ function onSignal(m) {
         return reset();
       }
       peerName = m.name || peerName;
+      rememberDevice(peerId, peerName);
+      fitPending = store.get('autoFit', '1') !== '0';          // ajusta a janela quando a primeira imagem chegar
       homeMsg('');
       preparePC();
       showSession(true);
@@ -145,10 +150,10 @@ function preparePC() {
   if (role === 'controller') {
     pc.ondatachannel = (e) => { dc = e.channel; setupDC(); };
     pc.ontrack = (e) => {
-      clearTimeout(videoTimer);
-      $('#remote').srcObject = e.streams[0];
-      $('#waiting').hidden = true;
-      $('#remote').focus();
+      // Cada faixa chega com o id do seu stream; o host diz (mensagem "views") qual stream é de qual janela.
+      if (!e.streams[0]) return;
+      streamById.set(e.streams[0].id, e.streams[0]);
+      assignStreams();
     };
   }
 }
@@ -158,11 +163,12 @@ async function startHost() {
   showSession(false);
   try { monState = await window.rea.monitors.get(true); } catch {}      // cada sessão começa no monitor principal
   try {
-    localStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+    localStream = await captureMonitor(monState.selected);
   } catch {
     toast('Não foi possível compartilhar a tela deste computador. Feche o programa, abra de novo e tente outra vez.', 8000);
     return endSession(true);
   }
+  primaryStreamId = localStream.id;           // é por este id que o controlador reconhece a janela principal (não muda com replaceTrack)
   localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
   dc = pc.createDataChannel('ctl'); setupDC();
   const offer = await pc.createOffer();
@@ -181,6 +187,8 @@ async function onRtc(d) {
         const ans = await pc.createAnswer();
         await pc.setLocalDescription(ans);
         send({ t: 'sig', to: peerId, data: { sdp: pc.localDescription } });
+      } else if (role === 'host' && pendingReneg && pc.signalingState === 'stable') {
+        pendingReneg = false; renegotiate();           // havia uma mudança de faixas esperando a resposta anterior
       }
     } else if (d.ice) {
       hasRemote ? await pc.addIceCandidate(d.ice) : pendingIce.push(d.ice);
@@ -212,6 +220,9 @@ async function onDC(m) {
     case 'monitor': // o controlador escolheu outro monitor para ver (só o host reage; clientes antigos nem enviam isto)
       if (role === 'host') hostSwitchMonitor(String(m.id));
       break;
+    case 'view': // o controlador abriu/trocou/fechou a janela extra (outro monitor); hosts antigos ignoram esta mensagem
+      if (role === 'host') hostViewOp(m);
+      break;
     case 'monitors': // o host informa a lista de monitores e qual está sendo transmitido (hosts antigos nunca enviam)
       if (role === 'controller') onMonitors(m);
       break;
@@ -222,7 +233,12 @@ async function onDC(m) {
       if (role === 'controller') $('#curToggle').checked = !!m.show;
       break;
     case 'chat':
-      log(`${who()}: ${String(m.text).slice(0, 2000)}`); break;
+      log(`${who()}: ${String(m.text).slice(0, 2000)}`);
+      if (chatHidden) {                                   // conversa escondida: conta as não lidas e avisa só na primeira
+        chatUnread++; applyChat();
+        if (chatUnread === 1) toast(`Nova mensagem de ${who()}. Clique em "Mostrar conversa" para ler.`, 5000);
+      }
+      break;
     case 'clip':
       if (role === 'host') {
         if (!perms.files) return;
@@ -287,7 +303,7 @@ function showSession(waiting) {
   $('#hostPeer').textContent = `${who()} (código ${fmtId(peerId)})`;
   $('#waiting').hidden = host || !waiting;
   $('#ctlWrap').hidden = host; $('#btnClipGet').hidden = host; $('#btnClipSend').hidden = host; $('#btnRefresh').hidden = host; $('#curWrap').hidden = host;
-  $('#btnFull').hidden = host;
+  $('#btnFull').hidden = host; $('#btnView').hidden = host; $('#btnFit').hidden = host;
   $('#btnFile').hidden = host && !perms.files;
   $('#btnEnd').hidden = false;
   $('#remote').hidden = host;
@@ -306,23 +322,28 @@ function reset() {
   try { dc?.close(); } catch {}
   try { pc?.close(); } catch {}
   localStream?.getTracks().forEach((t) => t.stop());
+  extraView?.stream.getTracks().forEach((t) => t.stop());
+  closeViewWindow();
   $('#remote').srcObject = null;
   pc = dc = localStream = null; peerId = role = null; peerName = ''; rx = null;
+  extraView = null; primaryStreamId = null; pendingReneg = false; viewsInfo = null; streamById.clear();
   monState = { list: [], selected: null, rev: 0 }; viewMon = null; pendingSelect = null;
+  $('#btnPopout').hidden = true;
   $('#monPick').hidden = true; $('#monPick').textContent = ''; $('#monNote').hidden = true;
   perms = { control: false, files: false };
   pendingIce = []; hasRemote = false;
   $('#session').hidden = true; $('#home').hidden = false; $('#log').textContent = '';
-  $('#btnConnect').disabled = false;
+  chatUnread = 0; applyChat();
+  $('#btnConnect').disabled = false; setHistBusy(false);
   window.rea.sessionState(false);
   if (document.fullscreenElement) document.exitFullscreen();
 }
 
 /* ---------- Entrada do controlador (mouse/teclado) ---------- */
 const video = $('#remote');
-function norm(e) {
-  const r = video.getBoundingClientRect();
-  const vw = video.videoWidth, vh = video.videoHeight;
+function norm(e, v = video) {
+  const r = v.getBoundingClientRect();
+  const vw = v.videoWidth, vh = v.videoHeight;
   if (!vw || !vh) return null;
   const s = Math.min(r.width / vw, r.height / vh);
   const w = vw * s, h = vh * s;
@@ -331,31 +352,92 @@ function norm(e) {
   return x < 0 || x > 1 || y < 0 || y > 1 ? null : { x, y };
 }
 const controlling = () => role === 'controller' && $('#ctlToggle').checked;
-let lastMove = 0;
-video.addEventListener('mousemove', (e) => {
-  if (!controlling()) return;
-  const now = performance.now(); if (now - lastMove < 16) return; lastMove = now;
-  const p = norm(e); if (p) dsend({ k: 'mouse', type: 'move', mon: viewMon, ...p });
-});
-for (const type of ['down', 'up']) {
-  video.addEventListener('mouse' + type, (e) => {
+// Liga mouse e teclado a uma imagem (a janela principal e a segunda janela usam a mesma função).
+// `getMon` devolve o monitor que ESSA imagem mostra; vai em cada mensagem de mouse (`mon`).
+function attachInput(v, getMon) {
+  let lastMv = 0;
+  v.addEventListener('mousemove', (e) => {
     if (!controlling()) return;
-    video.focus(); e.preventDefault();
-    const p = norm(e); if (p) dsend({ k: 'mouse', type, button: e.button, mon: viewMon, ...p });
+    const now = performance.now(); if (now - lastMv < 16) return; lastMv = now;
+    const p = norm(e, v); if (p) dsend({ k: 'mouse', type: 'move', mon: getMon(), ...p });
   });
+  for (const type of ['down', 'up']) {
+    v.addEventListener('mouse' + type, (e) => {
+      if (!controlling()) return;
+      v.focus(); e.preventDefault();
+      const p = norm(e, v); if (p) dsend({ k: 'mouse', type, button: e.button, mon: getMon(), ...p });
+    });
+  }
+  v.addEventListener('wheel', (e) => {
+    if (!controlling()) return; e.preventDefault();
+    const p = norm(e, v); if (p) dsend({ k: 'mouse', type: 'wheel', mon: getMon(), dy: e.deltaMode === 0 ? e.deltaY : e.deltaY * 40, ...p });
+  }, { passive: false });
+  v.addEventListener('contextmenu', (e) => e.preventDefault());
+  for (const down of [true, false]) {
+    v.addEventListener(down ? 'keydown' : 'keyup', (e) => {
+      if (!controlling()) return;
+      e.preventDefault();
+      dsend({ k: 'key', down, code: e.code });
+    });
+  }
 }
-video.addEventListener('wheel', (e) => {
-  if (!controlling()) return; e.preventDefault();
-  const p = norm(e); if (p) dsend({ k: 'mouse', type: 'wheel', mon: viewMon, dy: e.deltaMode === 0 ? e.deltaY : e.deltaY * 40, ...p });
-}, { passive: false });
-video.addEventListener('contextmenu', (e) => e.preventDefault());
-for (const down of [true, false]) {
-  video.addEventListener(down ? 'keydown' : 'keyup', (e) => {
-    if (!controlling()) return;
-    e.preventDefault();
-    dsend({ k: 'key', down, code: e.code });
-  });
+attachInput(video, () => viewMon);
+
+/* ---------- Modo de exibição: esticada / reduzida ---------- */
+// Esticada: a imagem preenche a janela e é ampliada se a janela for maior que a tela remota.
+// Reduzida (padrão): só diminui quando é maior que a janela, sem ampliar (tamanho real, centralizada, sem borrar).
+// Vale para a janela principal e para a segunda janela; a escolha é lembrada (localStorage "viewMode").
+const VM = window.REA_VIEWMODE;
+let viewMode = VM.normalize(store.get('viewMode', VM.DEFAULT));
+function layoutVideo(t) {
+  const f = VM.fit(t.video.videoWidth, t.video.videoHeight, t.area.clientWidth, t.area.clientHeight, t.win.devicePixelRatio || 1, viewMode);
+  t.area.classList.toggle('shrink', viewMode === 'shrink');
+  t.video.style.width = f ? f.width + 'px' : '';
+  t.video.style.height = f ? f.height + 'px' : '';
 }
+function registerVideo(video, area, win) {                   // area = contêiner da imagem; recalcula quando o tamanho muda
+  const t = { video, area, win, ro: null };
+  const relayout = () => layoutVideo(t);
+  t.ro = new win.ResizeObserver(relayout); t.ro.observe(area);
+  video.addEventListener('loadedmetadata', relayout);
+  video.addEventListener('resize', relayout);                 // o outro computador mudou de resolução / de monitor
+  win.addEventListener('resize', relayout);
+  layoutVideo(t);
+  return t;
+}
+function unregisterVideo(t) { try { t.ro.disconnect(); } catch {} }
+const mainVideoView = registerVideo(video, $('#viewWrap'), window);
+function updateViewButtons() {
+  const text = VM.label(viewMode);
+  $('#btnView').textContent = text; $('#btnView').title = VM.HELP;
+  $('#btnView').setAttribute('aria-pressed', String(viewMode === 'shrink'));
+  if (view2 && view2.win && !view2.win.closed) { const b = view2.win.document.getElementById('viewBtn2'); if (b) { b.textContent = text; b.title = VM.HELP; } }
+}
+function setViewMode(m) {
+  viewMode = VM.normalize(m);
+  store.set('viewMode', viewMode);
+  layoutVideo(mainVideoView);
+  if (view2 && view2.vt) layoutVideo(view2.vt);
+  updateViewButtons();
+}
+$('#btnView').onclick = () => { setViewMode(VM.next(viewMode)); if (role === 'controller' && controlling()) video.focus(); };
+
+// Ajustar a janela à tela remota (como o AnyDesk): o tamanho desejado da área da imagem é o tamanho REAL da tela remota
+// (1 pixel remoto = 1 pixel do seu monitor) mais uma margem; o processo principal limita à área útil do monitor.
+// A barra de botões muda de altura conforme a largura, por isso medimos o "resto da janela" e repetimos uma vez.
+let fitPending = false;
+const FIT_MARGIN = 24;
+async function fitWindowToRemote() {
+  if (role !== 'controller' || !video.videoWidth) return;
+  const area = $('#viewWrap'), dpr = window.devicePixelRatio || 1;
+  const chromeW = window.innerWidth - area.clientWidth, chromeH = window.innerHeight - area.clientHeight;
+  const w = Math.ceil(video.videoWidth / dpr) + 2 * FIT_MARGIN + chromeW;
+  const h = Math.ceil(video.videoHeight / dpr) + 2 * FIT_MARGIN + chromeH;
+  try { await window.rea.fitWindow(w, h); } catch {}
+}
+async function fitWindowTwice() { await fitWindowToRemote(); await new Promise((r) => setTimeout(r, 450)); await fitWindowToRemote(); }
+video.addEventListener('loadedmetadata', () => { if (fitPending) { fitPending = false; setTimeout(fitWindowTwice, 250); } });
+$('#btnFit').onclick = () => { fitWindowTwice(); if (controlling()) video.focus(); };
 // Ao minimizar / trocar de janela, nada deve ficar pressionado no computador remoto.
 const releaseRemote = () => { if (role === 'controller') dsend({ k: 'release' }); };
 window.addEventListener('blur', releaseRemote);
@@ -370,9 +452,74 @@ let monState = { list: [], selected: null, rev: 0 };   // host: vem do processo 
 let viewMon = null;                                     // controlador: monitor que está na tela
 let switching = null, pendingSelect = null;             // host: troca em andamento / pedido que chegou durante a troca
 
+// Segunda janela (outro monitor da MESMA sessão). Em vez de abrir uma segunda conexão (o computador controlado só aceita uma
+// sessão), o host manda uma SEGUNDA faixa de vídeo pela conexão existente e o controlador a mostra numa janela extra.
+//   controlador -> host  { k:'view', op:'open'|'set'|'close', id }      (op 'open'/'set' = mostrar o monitor `id` na janela extra)
+//   host -> controlador  { k:'monitors', ..., views:[{slot:1,monitor,streamId},{slot:2,monitor,streamId}], viewLost? }
+//   o controlador liga cada faixa recebida à janela certa pelo id do stream (streamId).
+let extraView = null;            // host: { monitor, stream, sender, streamId } (monitor mostrado na janela extra)
+let primaryStreamId = null;      // host: id do stream da janela principal (é o id que o controlador enxerga; replaceTrack não o muda)
+let pendingReneg = false;        // host: mudança de faixas esperando a resposta da negociação anterior
+let captureChain = Promise.resolve();   // host: capturas uma de cada vez (a escolha do monitor vai por um "pedido" ao processo principal)
+let viewOps = Promise.resolve();        // host: pedidos da janela extra uma de cada vez
+let viewsInfo = null;            // controlador: o que o host disse sobre as janelas; null = host antigo (só uma janela)
+const streamById = new Map();    // controlador: streams recebidos, por id
+let view2 = null;                // controlador: { win, video, monitor, pending, closing }
+
+function captureMonitor(id) {
+  const run = async () => {
+    await window.rea.monitors.captureHint(id);
+    return navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+  };
+  const p = captureChain.then(run, run);
+  captureChain = p.catch(() => {});
+  return p;
+}
+async function renegotiate() {
+  if (!pc || role !== 'host') return;
+  if (pc.signalingState !== 'stable') { pendingReneg = true; return; }
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  send({ t: 'sig', to: peerId, data: { sdp: pc.localDescription } });
+}
+async function hostOpenView(id) {
+  const stream = await captureMonitor(id);
+  const sender = pc.addTrack(stream.getVideoTracks()[0], stream);
+  extraView = { monitor: id, stream, sender, streamId: stream.id };
+  await renegotiate();
+}
+async function hostSetView(id) {
+  const next = await captureMonitor(id);
+  await extraView.sender.replaceTrack(next.getVideoTracks()[0]);
+  extraView.stream.getTracks().forEach((t) => t.stop());
+  extraView.stream = next; extraView.monitor = id;             // streamId (o id que o controlador conhece) continua o mesmo
+}
+async function hostCloseView() {
+  if (!extraView) return;
+  const e = extraView; extraView = null;
+  try { pc.removeTrack(e.sender); } catch {}
+  e.stream.getTracks().forEach((t) => t.stop());
+  await renegotiate();
+}
+function hostViewOp(m) {
+  if (role !== 'host') return;
+  viewOps = viewOps.then(async () => {
+    const id = String(m.id == null ? '' : m.id);
+    try {
+      if (m.op === 'close') await hostCloseView();
+      else if (m.op === 'open' || m.op === 'set') {
+        const valid = monState.list.some((x) => x.id === id) && id !== monState.selected;   // não pode repetir o monitor da janela principal
+        if (valid && !extraView) await hostOpenView(id);
+        else if (valid && extraView.monitor !== id) await hostSetView(id);
+      }
+    } catch (err) { console.error('janela extra', err); toast('Não foi possível mostrar o segundo monitor agora.'); }
+    hostSendMonitors();
+  });
+}
+
 // Host: captura de novo o monitor selecionado e troca a faixa de vídeo SEM renegociar (replaceTrack).
 async function applyCapture() {
-  const next = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+  const next = await captureMonitor(monState.selected);
   const snd = pc && pc.getSenders().find((s) => s.track && s.track.kind === 'video');
   if (!snd) { next.getTracks().forEach((t) => t.stop()); throw new Error('sem faixa de vídeo para trocar'); }
   const old = localStream;
@@ -380,15 +527,19 @@ async function applyCapture() {
   localStream = next;
   old?.getTracks().forEach((t) => t.stop());
 }
-function hostSendMonitors(extra = {}) {
+function hostSendMonitors(more = {}) {
   if (role !== 'host') return;
-  dsend({ k: 'monitors', list: monState.list, selected: monState.selected, rev: monState.rev, ...extra });
-  const idx = (monState.list.find((m) => m.id === monState.selected) || {}).index;
-  $('#monNote').hidden = !(monState.list.length > 1 && idx);
-  if (idx) $('#monNum').textContent = String(idx);
+  const views = [{ slot: 1, monitor: monState.selected, streamId: primaryStreamId }];
+  if (extraView) views.push({ slot: 2, monitor: extraView.monitor, streamId: extraView.streamId });
+  dsend({ k: 'monitors', list: monState.list, selected: monState.selected, rev: monState.rev, views, ...more });
+  const idx = (id) => (monState.list.find((m) => m.id === id) || {}).index;
+  const shown = [idx(monState.selected), extraView && idx(extraView.monitor)].filter(Boolean).sort();
+  $('#monNote').hidden = !(monState.list.length > 1 && shown.length);
+  $('#monNum').textContent = shown.join(' e ');
 }
 async function hostSwitchMonitor(id) {
   if (role !== 'host') return;
+  if (extraView && extraView.monitor === id) return hostSendMonitors();   // esse monitor já está na janela extra
   if (switching) { pendingSelect = id; return; }                      // já trocando: guarda o último pedido
   switching = (async () => {
     let target = id;
@@ -414,7 +565,14 @@ window.rea.monitors.onChanged(async (s) => {
   if (s.recapture) {                                                  // o monitor transmitido mudou ou sumiu
     try { await applyCapture(); } catch (err) { console.error('recaptura', err); toast('A tela mudou e não foi possível atualizar a imagem. Use "Atualizar imagem".'); }
   }
-  hostSendMonitors({ reason: s.selectionLost ? 'lost' : 'changed' });
+  // janela extra: se o monitor dela sumiu (ou passou a ser o da janela principal), fecha; se mudou de resolução/orientação, captura de novo
+  let viewLost = false;
+  if (extraView) {
+    const gone = !s.list.some((m) => m.id === extraView.monitor) || extraView.monitor === s.selected;
+    if (gone) { viewLost = true; try { await hostCloseView(); } catch (err) { console.error('fechar janela extra', err); } }
+    else if ((s.changed || []).includes(extraView.monitor)) { try { await hostSetView(extraView.monitor); } catch (err) { console.error('recaptura da janela extra', err); } }
+  }
+  hostSendMonitors({ reason: s.selectionLost ? 'lost' : 'changed', viewLost });
 });
 
 // Controlador: recebe a lista e mostra os botões de monitor (só aparecem se houver mais de um).
@@ -422,26 +580,115 @@ function onMonitors(m) {
   if (!Array.isArray(m.list)) return;
   monState = { list: m.list, selected: m.selected == null ? null : String(m.selected), rev: m.rev || 0 };
   viewMon = monState.selected;
+  if (Array.isArray(m.views)) {                       // host que sabe mandar uma segunda janela
+    viewsInfo = m.views;
+    const v2 = m.views.find((v) => v.slot === 2);
+    if (view2 && v2) { view2.monitor = String(v2.monitor); view2.pending = false; }
+    else if (view2 && !view2.pending) { closeViewWindow(); toast(m.viewLost ? 'O monitor da segunda janela foi desconectado. A janela foi fechada.' : 'A segunda janela foi encerrada.', 6000); }
+    assignStreams();
+  }
   renderMonitors();
   if (m.reason === 'lost') toast('O monitor que você estava vendo foi desconectado. Agora você vê o monitor principal.', 6000);
-  else if (m.reason === 'changed') toast('A configuração dos monitores do outro computador mudou.', 4000);
+  else if (m.reason === 'changed' && !m.viewLost) toast('A configuração dos monitores do outro computador mudou.', 4000);
+}
+// Liga cada stream recebido à janela certa (principal ou extra).
+function assignStreams() {
+  const info = viewsInfo || [{ slot: 1, streamId: [...streamById.keys()][0] }];   // host antigo: o único stream é a janela principal
+  for (const v of info) {
+    const st = streamById.get(v.streamId);
+    if (!st) continue;
+    if (v.slot === 1 && $('#remote').srcObject !== st) {
+      clearTimeout(videoTimer);
+      $('#remote').srcObject = st; $('#waiting').hidden = true; $('#remote').focus();
+    }
+    if (v.slot === 2 && view2 && view2.video.srcObject !== st) { view2.video.srcObject = st; view2.video.play().catch(() => {}); }
+  }
 }
 function renderMonitors() {
   const box = $('#monPick'), list = monState.list;
   box.hidden = list.length < 2;
-  if (box.hidden) { box.textContent = ''; return; }
+  $('#btnPopout').hidden = !(role === 'controller' && list.length > 1 && viewsInfo);
+  if (box.hidden) { box.textContent = ''; renderViewBar(); return; }
   box.textContent = '';
   const lab = document.createElement('span'); lab.className = 'monlabel'; lab.textContent = 'Monitor:'; box.append(lab);
   for (const m of list) {
+    const inOther = !!view2 && m.id === view2.monitor;       // esse monitor está na outra janela
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'ghost' + (m.id === monState.selected ? ' on' : '');
-    b.textContent = String(m.index);
-    b.title = `Monitor ${m.index}: ${m.w}×${m.h}${m.primary ? ' (principal)' : ''}`;
+    b.textContent = String(m.index); b.disabled = inOther;
+    b.title = inOther ? `Monitor ${m.index}: já está aberto na outra janela` : `Monitor ${m.index}: ${m.w}×${m.h}${m.primary ? ' (principal)' : ''}`;
     b.setAttribute('aria-pressed', m.id === monState.selected ? 'true' : 'false');
     b.onclick = () => { if (m.id !== monState.selected) dsend({ k: 'monitor', id: m.id }); };
     box.append(b);
   }
+  renderViewBar();
 }
+
+// Controlador: segunda janela (about:blank aberto pelo processo principal, montado aqui). Roda no mesmo código desta janela,
+// então reaproveita a conexão, o mouse e o teclado (attachInput) sem nada novo para sincronizar.
+function openViewWindow() {
+  if (view2 && view2.win && !view2.win.closed) { view2.win.focus(); return; }
+  const target = monState.list.find((m) => m.id !== monState.selected);          // primeiro monitor que a janela principal não mostra
+  if (!target) return;
+  let w = null;
+  try { w = window.open('about:blank', 'rea-view-2'); } catch {}
+  if (!w) return toast('Não foi possível abrir a segunda janela.');
+  const d = w.document;
+  d.title = 'REA Desk – segundo monitor';
+  const css = d.createElement('link'); css.rel = 'stylesheet'; css.href = new URL('style.css', location.href).href; d.head.append(css);
+  d.body.className = 'viewwin';
+  const bar = d.createElement('div'); bar.className = 'bar';
+  const info = d.createElement('span'); info.id = 'info';
+  const sp = d.createElement('span'); sp.className = 'spacer';
+  const pick = d.createElement('span'); pick.className = 'monpick'; pick.id = 'monPick2';
+  const full = d.createElement('button'); full.className = 'ghost'; full.textContent = 'Tela cheia';
+  const close = d.createElement('button'); close.className = 'danger'; close.textContent = 'Fechar esta janela';
+  const vmode = d.createElement('button'); vmode.className = 'ghost'; vmode.id = 'viewBtn2';
+  bar.append(info, sp, pick, vmode, full, close);
+  const v = d.createElement('video'); v.autoplay = true; v.muted = true; v.playsInline = true; v.tabIndex = 0;
+  const area = d.createElement('div'); area.className = 'viewarea'; area.append(v);
+  d.body.append(bar, area);
+  full.onclick = () => (d.fullscreenElement ? d.exitFullscreen() : area.requestFullscreen());
+  close.onclick = () => w.close();
+  vmode.onclick = () => setViewMode(VM.next(viewMode));
+  view2 = { win: w, video: v, monitor: target.id, pending: true, closing: false, vt: registerVideo(v, area, w) };
+  updateViewButtons();
+  attachInput(v, () => view2 && view2.monitor);
+  w.addEventListener('blur', releaseRemote);
+  v.addEventListener('pause', () => { if (view2 && view2.video === v && v.srcObject) v.play().catch(() => {}); });
+  w.addEventListener('pagehide', () => {                                           // o usuário fechou a janela
+    if (!view2 || view2.win !== w) return;
+    const mine = view2; view2 = null;
+    unregisterVideo(mine.vt);
+    if (!mine.closing) dsend({ k: 'view', op: 'close' });
+    renderMonitors();
+  });
+  dsend({ k: 'view', op: 'open', id: target.id });
+  setTimeout(() => { if (view2 && view2.win === w && view2.pending) { closeViewWindow(); toast('O outro computador não conseguiu abrir o segundo monitor.', 6000); } }, 10000);
+  renderMonitors();
+}
+function closeViewWindow() {
+  if (!view2) return;
+  const w = view2.win; view2.closing = true; unregisterVideo(view2.vt); view2 = null;
+  try { w.close(); } catch {}
+  if (role === 'controller') renderMonitors();
+}
+function renderViewBar() {
+  if (!view2 || !view2.win || view2.win.closed) return;
+  const d = view2.win.document, box = d.getElementById('monPick2'), list = monState.list;
+  const mon = list.find((m) => m.id === view2.monitor);
+  d.getElementById('info').textContent = mon ? `Monitor ${mon.index} de ${who()}` : `Segundo monitor de ${who()}`;
+  box.textContent = '';
+  for (const m of list) {
+    const b = d.createElement('button'); b.type = 'button';
+    const mine = m.id === view2.monitor, inMain = m.id === monState.selected;
+    b.className = 'ghost' + (mine ? ' on' : ''); b.textContent = String(m.index); b.disabled = inMain;
+    b.title = inMain ? `Monitor ${m.index}: já está aberto na janela principal` : `Monitor ${m.index}: ${m.w}×${m.h}${m.primary ? ' (principal)' : ''}`;
+    b.onclick = () => { if (!mine) dsend({ k: 'view', op: 'set', id: m.id }); };
+    box.append(b);
+  }
+}
+$('#btnPopout').onclick = openViewWindow;
 
 /* ---------- Mostrar / esconder o mouse do computador controlado ---------- */
 // O ponteiro vai embutido na imagem e não dá para tirá-lo só do vídeo; então ele é escondido no próprio computador
@@ -512,15 +759,40 @@ window.addEventListener('focus', wake);
 window.addEventListener('resize', wake);
 video.addEventListener('pause', () => { if (role === 'controller' && video.srcObject) video.play().catch(() => {}); });
 
+/* ---------- Ocultar / mostrar a conversa ---------- */
+// A escolha é lembrada entre sessões (localStorage "chatHidden"). Com a conversa escondida, a imagem do outro computador ocupa a
+// janela toda; mensagens novas viram um contador no botão (e um aviso na primeira), e nada se perde: ao mostrar, estão lá.
+let chatHidden = store.get('chatHidden', '0') === '1';
+let chatUnread = 0;
+function applyChat() {
+  document.querySelector('.stage').classList.toggle('nochat', chatHidden);
+  $('#chatBtnText').textContent = chatHidden ? 'Mostrar conversa' : 'Ocultar conversa';
+  $('#btnChat').setAttribute('aria-pressed', String(!chatHidden));
+  const b = $('#chatBadge');
+  b.hidden = !(chatHidden && chatUnread > 0);
+  b.textContent = chatUnread > 99 ? '99+' : String(chatUnread);
+  if (!b.hidden) b.setAttribute('aria-label', `${chatUnread} mensagens novas`);
+}
+function setChatHidden(hide) {
+  chatHidden = hide;
+  if (!hide) chatUnread = 0;
+  store.set('chatHidden', hide ? '1' : '0');
+  applyChat();
+  if (!hide) { $('#log').scrollTop = 1e9; setTimeout(() => $('#chatText').focus(), 0); }
+  else if (role === 'controller' && controlling()) video.focus();      // o teclado volta para o outro computador
+}
+$('#btnChat').onclick = () => setChatHidden(!chatHidden);
+applyChat();
+updateViewButtons();      // (depois da declaração de view2)
+
 /* ---------- Botões ---------- */
-$('#btnConnect').onclick = () => {
-  const id = digits($('#remoteId').value);
+function startCall(id) {
   if (id.length !== 9) return homeMsg('Digite os 9 números do código que a outra pessoa informou.');
   if (id === myId) return homeMsg('Esse é o código deste computador. Digite o código da outra pessoa.');
   if (!ws || ws.readyState !== 1) return homeMsg('Ainda estamos conectando. Aguarde alguns segundos e tente de novo.');
   if (peerId) return;
   peerId = id; role = 'controller'; peerName = '';
-  $('#btnConnect').disabled = true;
+  $('#btnConnect').disabled = true; setHistBusy(true);
   homeMsg('Pedido enviado. Aguardando a outra pessoa permitir o acesso…', true);
   send({ t: 'call', to: id, name: myName });
   callTimer = setTimeout(() => {
@@ -530,7 +802,64 @@ $('#btnConnect').onclick = () => {
       reset();
     }
   }, 60000);
+}
+$('#btnConnect').onclick = () => startCall(digits($('#remoteId').value));
+
+/* ---------- Histórico de computadores acessados ---------- */
+// Cada acesso aceito é lembrado (código, nome, data), para conectar de novo com um clique, sem digitar o código.
+// Fica em localStorage ("history"), em AppData, e sobrevive às atualizações. Lógica em history.js (testada em npm test).
+const HIST = window.REA_HISTORY;
+let devHist = HIST.parse(store.get('history', '[]'));
+let editingId = null;
+const saveHistory = () => store.set('history', JSON.stringify(devHist));
+function setHistBusy(b) { document.querySelector('.hist').classList.toggle('busy', !!b); }
+function rememberDevice(id, name) { devHist = HIST.record(devHist, id, name); saveHistory(); renderHistory(); }
+function connectFromHistory(id) { $('#remoteId').value = fmtId(id); homeMsg(''); startCall(id); }
+
+function histButton(cls, text, title, onclick) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = cls; b.textContent = text; b.title = title; b.setAttribute('aria-label', title); b.onclick = onclick;
+  return b;
+}
+function renderHistory() {
+  const list = $('#histList'); list.textContent = '';
+  $('#histEmpty').hidden = devHist.length > 0;
+  $('#histClear').hidden = devHist.length === 0;
+  for (const e of devHist) {
+    const li = document.createElement('li'); li.dataset.id = e.id;
+    const name = HIST.displayName(e);
+    if (editingId === e.id) {
+      const inp = document.createElement('input');
+      inp.className = 'hist-edit'; inp.value = e.name; inp.maxLength = 40; inp.placeholder = 'Nome deste computador'; inp.setAttribute('aria-label', 'Nome do computador');
+      let done = false;
+      const finish = (save) => { if (done) return; done = true; editingId = null; if (save) { devHist = HIST.rename(devHist, e.id, inp.value); saveHistory(); } renderHistory(); };
+      inp.onkeydown = (ev) => { if (ev.key === 'Enter') finish(true); else if (ev.key === 'Escape') finish(false); };
+      inp.onblur = () => finish(true);
+      li.append(inp);
+      list.append(li);
+      setTimeout(() => { inp.focus(); inp.select(); }, 0);
+      continue;
+    }
+    const main = document.createElement('button');
+    main.type = 'button'; main.className = 'hist-main'; main.title = `Conectar a ${name}`;
+    const n = document.createElement('span'); n.className = 'hist-name'; n.textContent = name;
+    const sub = document.createElement('span'); sub.className = 'hist-sub'; sub.textContent = `${HIST.fmtCode(e.id)} · ${HIST.timeAgo(e.lastAt)}`;
+    main.append(n, sub);
+    main.onclick = () => connectFromHistory(e.id);
+    li.append(main,
+      histButton('hist-act' + (e.fav ? ' fav' : ''), e.fav ? '★' : '☆', e.fav ? 'Tirar dos favoritos' : 'Marcar como favorito', () => { devHist = HIST.toggleFavorite(devHist, e.id); saveHistory(); renderHistory(); }),
+      histButton('hist-act', '✎', 'Renomear', () => { editingId = e.id; renderHistory(); }),
+      histButton('hist-act', '✕', 'Remover do histórico', () => { devHist = HIST.remove(devHist, e.id); saveHistory(); renderHistory(); }));
+    list.append(li);
+  }
+}
+$('#histClear').onclick = () => {
+  if (!confirm('Apagar o histórico de computadores acessados?\n\nOs favoritos (★) serão mantidos.')) return;
+  devHist = HIST.clearKeepingFavorites(devHist); saveHistory(); renderHistory();
 };
+setInterval(() => { if (editingId === null && !$('#home').hidden) renderHistory(); }, 60000);   // atualiza o "há X min"
+renderHistory();
+
 $('#remoteId').addEventListener('keydown', (e) => e.key === 'Enter' && $('#btnConnect').click());
 $('#remoteId').addEventListener('input', (e) => (e.target.value = fmtId(digits(e.target.value))));
 $('#copyId').onclick = async () => { await window.rea.writeClipboard(fmtId(myId || '')); toast('Código copiado. Agora é só colar na mensagem para a pessoa.'); };
@@ -613,6 +942,7 @@ window.rea.update.get().then(renderUpdate).catch(() => {});
 $('#btnSettings').onclick = async () => {
   const info = await window.rea.info();
   $('#cfgName').value = myName; $('#cfgAuto').checked = info.autostart;
+  $('#cfgAutoFit').checked = store.get('autoFit', '1') !== '0';
   $('#cfgServer').value = cfg.server; $('#cfgStun').value = cfg.stun;
   $('#ver').textContent = '';
   window.rea.update.get().then(renderUpdate).catch(() => {});
@@ -628,6 +958,7 @@ $('#cfgSave').onclick = async () => {
   cfg.server = s; cfg.stun = $('#cfgStun').value.trim();
   store.set('server', cfg.server); store.set('stun', cfg.stun);
   await window.rea.setAutostart($('#cfgAuto').checked);
+  store.set('autoFit', $('#cfgAutoFit').checked ? '1' : '0');
   $('#settings').hidden = true;
   toast('Configurações salvas.');
   if (changed) { if (ws) { ws.onclose = null; ws.close(); } connectWS(); }

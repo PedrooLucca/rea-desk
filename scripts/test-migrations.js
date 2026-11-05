@@ -22,6 +22,16 @@ s = mem({ myId: '1', welcomed: '1' });
 run(s); run(s);
 assert.equal(s.getItem('dataVersion'), String(CURRENT));
 
+// histórico de dispositivos (passo 2): cria a lista vazia, mas nunca sobrescreve um histórico existente
+s = mem({ myId: '1' });
+run(s);
+assert.equal(s.getItem('history'), '[]');
+const hist = JSON.stringify([{ id: '123456789', name: 'Maria-PC', lastAt: 1, count: 3, fav: true, custom: false }]);
+s = mem({ dataVersion: '1', myId: '1', history: hist });          // atualização da versão 1 -> 2 com histórico já gravado
+run(s);
+assert.equal(s.getItem('history'), hist, 'histórico existente é preservado');
+assert.equal(s.getItem('dataVersion'), String(CURRENT));
+
 // dados mais novos (rollback para versão antiga): não altera nada
 s = mem({ dataVersion: '99', custom: 'x' });
 assert.equal(run(s), 99);

@@ -26,9 +26,12 @@ contextBridge.exposeInMainWorld('rea', {
     setSilent: (on) => ipcRenderer.invoke('update-set-silent', !!on),
     onState: (cb) => ipcRenderer.on('update-state', (_e, s) => cb(s)),
   },
+  flushStorage: () => ipcRenderer.invoke('flush-storage'),
+  fitWindow: (w, h) => ipcRenderer.invoke('fit-window', w, h),
   monitors: {
     get: (reset) => ipcRenderer.invoke('monitors-get', !!reset),
     select: (id) => ipcRenderer.invoke('monitor-select', String(id)),
+    captureHint: (id) => ipcRenderer.invoke('monitors-capture-hint', id == null ? null : String(id)),
     onChanged: (cb) => ipcRenderer.on('monitors-changed', (_e, s) => cb(s)),
   },
   onCursorRestored: (cb) => ipcRenderer.on('cursor-restored', () => cb()),

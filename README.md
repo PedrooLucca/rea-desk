@@ -30,6 +30,48 @@ baixa só o que mudou, mostra "Nova versão disponível. Atualizar agora ou depo
 instala sem pedir administrador, mantém os dados do usuário, e faz **rollback automático** se a versão nova não abrir.
 Como lançar versões e como testar localmente: **[LANCAR-VERSAO.md](LANCAR-VERSAO.md)** (um comando: `npm run release -- patch`).
 
+## Exibição da tela: esticada ou reduzida
+
+O botão **Exibição: esticada / reduzida** (barra de quem controla) alterna como a tela do outro computador aparece na sua janela:
+- **Esticada**: a imagem preenche a janela mantendo a proporção; se a janela for maior que a tela remota, a imagem é **ampliada**
+  (pode ficar borrada).
+- **Reduzida** (padrão): só **diminui** quando a imagem é maior que a janela e **nunca amplia**. Se a janela for maior, a imagem fica no tamanho real
+  (1 pixel remoto = 1 pixel do seu monitor, já descontada a escala do Windows), centralizada e nítida, com barras pretas em volta.
+
+Vale para a janela principal e para a segunda janela (alternar em uma muda as duas), recalcula sozinho ao redimensionar, esconder a conversa,
+mudar de monitor ou quando o outro computador muda de resolução, e é lembrado entre sessões (`localStorage`, chave `viewMode`). O mouse
+continua mapeado certo nos dois modos; cliques nas barras pretas são ignorados. Lógica pura em `src/renderer/viewmode.js`, testada em
+`scripts/test-viewmode.js` (`npm test`).
+
+### Ajuste automático da janela (como o AnyDesk)
+
+O AnyDesk mostra a tela remota em **tamanho real, centralizada, com margens escuras**, porque a janela se ajusta ao tamanho da tela remota.
+O REA Desk faz o mesmo: **ao conectar**, a janela se redimensiona para caber a tela remota (1 pixel remoto = 1 pixel do seu monitor, mais
+~24 px de margem de cada lado), limitada à área útil do monitor onde a janela está, e é centralizada. Uma tela remota de 1366×768 aparece em
+1366×768; uma de 1920×1080 num monitor 1920×1080 usa toda a área útil e a exibição reduzida a encolhe só o necessário para caber.
+Janela maximizada ou em tela cheia nunca é redimensionada. O botão **Ajustar janela** refaz o ajuste quando quiser, e em **Configurações** dá
+para desligar o ajuste automático ("Ajustar o tamanho da janela ao da tela do outro computador ao conectar", `localStorage` `autoFit`).
+## Conversa (ocultar / mostrar)
+
+Durante o acesso, o botão **Ocultar conversa** (barra de cima, nos dois computadores) esconde o painel da conversa e a imagem do outro
+computador passa a ocupar a janela toda; **Mostrar conversa** traz o painel de volta. Mensagens que chegam com a conversa escondida
+não se perdem: aparece um contador no botão (e um aviso discreto na primeira), e ao mostrar elas estão no histórico da conversa. A escolha é
+lembrada entre sessões e ao reabrir o programa (`localStorage`, chave `chatHidden`). Em janelas muito estreitas (menos de 760 px) a conversa
+já fica escondida e o botão não aparece.
+
+## Histórico de computadores acessados
+
+Cada acesso **aceito** é lembrado na tela inicial, em **Computadores recentes**: nome, código e "há quanto tempo". Um clique no item
+conecta, sem digitar o código (nem depois de fechar e abrir o programa). Cada item tem ★ (favorito, fica sempre no topo e nunca é
+descartado), ✎ (renomear; o nome que você escolhe não é mais trocado pelo nome informado pelo outro computador) e ✕ (remover).
+**Limpar** apaga tudo, menos os favoritos. Guarda até 20 computadores; dados corrompidos ou antigos nunca impedem o programa de abrir.
+
+Onde fica: `localStorage` (chave `history`, JSON) em `%APPDATA%\rea-desk`, junto das outras configurações, então sobrevive às atualizações
+(migração para a versão de dados 2 em `src/renderer/migrations.js`). Para não perder o último item se o programa for encerrado à força, o
+programa pede a gravação em disco logo após cada mudança (`flush-storage`). Lógica pura em `src/renderer/history.js`, testes em
+`scripts/test-history.js` (`npm test`). Observação: o histórico guarda o código do outro computador; se ele reinstalar o programa e ganhar
+um código novo, remova o item antigo e conecte com o código novo.
+
 ## Vários monitores
 
 Se o computador controlado tem mais de um monitor, a barra de quem controla mostra **Monitor: 1 2 …**. Clicar em um número troca a
@@ -50,6 +92,21 @@ Como funciona (código em `src/monitors.js`, `src/main.js`, `src/input.js`, `src
 - Testes: `npm test` (lógica de coordenadas, seleção e hot-plug em `scripts/test-monitors.js`). `REA_TEST_MONITORS_FILE` (só testes) permite simular
   a lista de monitores por um arquivo JSON.
 - **Ainda não existe** a visão combinada "todos os monitores" (decisão de escopo); o protocolo reserva espaço para ela.
+
+### Duas janelas (um monitor em cada)
+
+Com mais de um monitor, o botão **Outro monitor em nova janela** abre uma segunda janela do aplicativo mostrando outro monitor do
+computador controlado, enquanto a janela principal mostra o seu. Cada janela tem seu seletor de monitor (o monitor que já está na outra
+fica desativado), mouse e teclado funcionam nas duas, e **fechar a segunda janela** (ou encerrar o acesso) a fecha em ambos os lados.
+
+Como funciona: continua **uma única sessão** (quem está sendo acessado aceita uma vez só, com as mesmas permissões). Em vez de uma segunda
+conexão, o computador controlado captura o segundo monitor e manda uma **segunda faixa de vídeo** pela mesma conexão (renegociação do WebRTC
+com `addTrack`/`removeTrack`). A segunda janela é um `about:blank` aberto pelo processo principal e montado pelo mesmo código da janela
+principal, então reaproveita a conexão e a entrada de mouse/teclado (`attachInput`), com o monitor de cada janela em `mon`.
+Protocolo: `controlador → host {k:'view', op:'open'|'set'|'close', id}`; o `{k:'monitors'}` do host ganha `views:[{slot,monitor,streamId}]`
+(e `viewLost`); o controlador liga cada faixa à janela certa pelo id do stream. Hosts ou controladores antigos ignoram o que não conhecem
+(o botão só aparece se o host mandar `views`). Hot-plug: se o monitor da segunda janela some, ela é fechada com um aviso.
+O computador controlado codifica duas imagens ao mesmo tempo (mais CPU e banda); o limite é uma janela extra.
 
 ## Como a conexão funciona (sem configurar nada)
 

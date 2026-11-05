@@ -46,6 +46,7 @@ function showWindow() {
 // O processo principal é o dono da lista de monitores e de qual está selecionado (é quem enxerga `screen` e
 // `desktopCapturer`). A lógica pura fica em src/monitors.js. Tudo em pixels FÍSICOS da área de trabalho virtual.
 let monitorList = [], selectedMonitor = null, monitorRev = 0, monitorTimer = null;
+let nextCaptureMonitor = null;   // pedido de captura de um monitor específico (usado pela segunda janela do controlador)
 
 function readDisplays() {
   // SÓ PARA TESTES: REA_TEST_MONITORS_FILE aponta para um JSON com a lista de monitores simulada (hot-plug sem hardware).
@@ -74,14 +75,16 @@ function refreshMonitors(notify) {
   monitorList = next; selectedMonitor = plan.selected;
   if (plan.topologyChanged || monitorRev === 0) monitorRev++;
   pushTopology();
-  if (notify && plan.topologyChanged) win?.webContents.send('monitors-changed', { ...monitorsState(), recapture: plan.recapture, selectionLost: plan.selectionLost });
+  if (notify && plan.topologyChanged) win?.webContents.send('monitors-changed', { ...monitorsState(), recapture: plan.recapture, selectionLost: plan.selectionLost, changed: plan.diff.changed, removed: plan.diff.removed });
 }
 // Escolhe a fonte de captura do monitor selecionado (captura SÓ ele: economiza banda e CPU).
 async function pickScreenSource() {
+  const target = nextCaptureMonitor != null ? nextCaptureMonitor : selectedMonitor;   // um pedido vale uma única captura
+  nextCaptureMonitor = null;
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
-  const byId = sources.find((s) => s.display_id && String(s.display_id) === String(selectedMonitor));
+  const byId = sources.find((s) => s.display_id && String(s.display_id) === String(target));
   if (byId) return byId;
-  const idx = monitorList.findIndex((m) => m.id === String(selectedMonitor));   // plano B: mesma ordem da lista de monitores
+  const idx = monitorList.findIndex((m) => m.id === String(target));   // plano B: mesma ordem da lista de monitores
   return sources[idx] || sources[0];
 }
 
@@ -119,9 +122,25 @@ function createWindow() {
   win.on('restore', () => win.webContents.send('window-back'));
   win.on('show', () => win.webContents.send('window-back'));
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    // Segunda janela do controlador (outro monitor da mesma sessão): about:blank com nome "rea-view-…", montada pelo renderer.
+    if (url === 'about:blank' && /^rea-view-\d+$/.test(frameName)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 1100, height: 700, minWidth: 480, minHeight: 360, title: 'REA Desk – segundo monitor', icon: iconPath,
+          backgroundColor: '#000000', autoHideMenuBar: true,
+          webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false },
+        },
+      };
+    }
     if (/^https?:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
+  });
+  win.webContents.on('did-create-window', (child) => {
+    child.setMenuBarVisibility(false);
+    child.webContents.on('will-navigate', (e) => e.preventDefault());
+    child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.on('did-finish-load', () => { wireInputPort(); updater.markLoaded(); updater.push(); });
@@ -175,11 +194,29 @@ app.whenReady().then(() => {
   const onTopology = () => { clearTimeout(monitorTimer); monitorTimer = setTimeout(() => refreshMonitors(true), 300); };
   for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(ev, onTopology);
   if (process.env.REA_TEST_MONITORS_FILE) fs.watchFile(process.env.REA_TEST_MONITORS_FILE, { interval: 200 }, onTopology);   // só testes
+  // O Chromium grava o localStorage em disco com atraso; o renderer pede a gravação logo após mudanças importantes
+  // (histórico, nome, código), para não perder dados se o programa for encerrado à força.
+  ipcMain.handle('flush-storage', () => { try { session.defaultSession.flushStorageData(); } catch {} return true; });
   ipcMain.handle('monitors-get', (_e, reset) => {
     refreshMonitors(false);
     if (reset) { const p = monitors.primaryOf(monitorList); if (p) { selectedMonitor = p.id; pushTopology(); } }   // cada sessão começa no monitor principal
     return monitorsState();
   });
+  // Ajusta o tamanho da janela ao da tela remota (como o AnyDesk): o renderer informa o tamanho DESEJADO da área interna (em DIP);
+  // aqui limitamos à área útil do monitor onde a janela está e centralizamos. Não mexe em janela maximizada/tela cheia.
+  ipcMain.handle('fit-window', (_e, w, h) => {
+    if (!win || win.isDestroyed() || win.isMaximized() || win.isFullScreen() || win.isMinimized()) return null;
+    const b = win.getBounds(), c = win.getContentBounds();
+    const frameW = b.width - c.width, frameH = b.height - c.height;
+    const wa = screen.getDisplayMatching(b).workArea;
+    const [minW, minH] = win.getMinimumSize();
+    const W = Math.min(Math.max(Math.round(Number(w) || 0) + frameW, minW || 0), wa.width);
+    const H = Math.min(Math.max(Math.round(Number(h) || 0) + frameH, minH || 0), wa.height);
+    win.setBounds({ x: wa.x + Math.round((wa.width - W) / 2), y: wa.y + Math.round((wa.height - H) / 2), width: W, height: H });
+    return { width: W - frameW, height: H - frameH };
+  });
+  // A próxima captura (getDisplayMedia) será do monitor `id` e não do selecionado (segunda janela do controlador).
+  ipcMain.handle('monitors-capture-hint', (_e, id) => { nextCaptureMonitor = id != null && monitorList.some((m) => m.id === String(id)) ? String(id) : null; return true; });
   ipcMain.handle('monitor-select', (_e, id) => {
     const ok = monitorList.some((m) => m.id === String(id));
     const changed = ok && selectedMonitor !== String(id);
