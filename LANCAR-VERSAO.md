@@ -8,17 +8,20 @@ mudou, e instala ao reiniciar. Os dados do usuário (nome, código, configuraç�
 1. **Instale o Git** (`winget install Git.Git`) e crie uma conta no GitHub.
 2. **Crie um repositório** no GitHub (pode ser privado só se você configurar um token de leitura nos clientes; para uso
    simples, crie **público**) com o nome que quiser, por exemplo `rea-desk`.
-3. **Informe o repositório** em `package.json`, no bloco `build > publish`: troque `SEU-USUARIO-GITHUB` pelo seu usuário
-   (e `rea-desk` pelo nome do repositório, se for outro).
-4. **Envie o projeto** para o repositório (na pasta do projeto):
+3. *(Já feito)* O repositório está informado em `package.json`, bloco `build > publish`: usuário `PedrooLucca`, repositório
+   `rea-desk`. Se usar outro nome de repositório, altere o campo `repo` ali.
+4. **Envie o projeto** para o repositório (o commit inicial já existe localmente; na pasta do projeto):
    ```bash
-   git init
-   git add -A
-   git commit -m "Primeira versão"
-   git branch -M main
-   git remote add origin https://github.com/SEU-USUARIO/rea-desk.git
+   git remote add origin https://github.com/PedrooLucca/rea-desk.git
    git push -u origin main
    ```
+   Na primeira vez o Git abre o navegador para você entrar no GitHub (é o seu login; ninguém mais precisa dele).
+   **Primeira versão publicada** (a versão 0.3.0 que já está no `package.json`):
+   ```bash
+   git tag -a v0.3.0 -m "Versão 0.3.0"
+   git push origin v0.3.0
+   ```
+   Isso dispara o GitHub Actions, que gera a Release com o instalador. Depois disso, use `npm run release -- patch`.
 5. *(Recomendado)* **Assinatura digital**: compre um certificado de assinatura de código (.pfx) e guarde-o nos *Secrets* do
    repositório (Settings > Secrets and variables > Actions): `WIN_CSC_LINK` (o .pfx em base64 ou uma URL) e
    `WIN_CSC_KEY_PASSWORD`. O pipeline passa a assinar sozinho. Depois acrescente em `package.json`, em `build.win`,
