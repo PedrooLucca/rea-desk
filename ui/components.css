@@ -1,0 +1,86 @@
+/*
+  Componentes base: botões, campos e foco. Valem para todas as telas.
+  (O CSS antigo em src/renderer/style.css é carregado antes e vai encolhendo a cada tela migrada.)
+*/
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--hit);
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+button:hover:not(:disabled) { background: var(--primary-hover); filter: none; }
+button:active:not(:disabled) { transform: scale(0.98); }
+button:disabled { opacity: 0.5; cursor: default; }
+button svg { width: 16px; height: 16px; flex: none; }
+
+button.ghost {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--foreground);
+}
+button.ghost:hover:not(:disabled) { background: var(--surface-2); }
+
+button.danger { background: var(--destructive); color: var(--destructive-foreground); }
+button.danger:hover:not(:disabled) { background: var(--destructive-hover); }
+
+/* Botão com cara de link (ações pequenas e secundárias) */
+button.linkbtn {
+  min-height: var(--hit-sm);
+  padding: 0 var(--space-2);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+button.linkbtn:hover:not(:disabled) { background: var(--surface-2); color: var(--foreground); }
+
+input:not([type=checkbox]) {
+  min-height: var(--hit);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--input);
+  color: var(--foreground);
+  font: inherit;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+input:not([type=checkbox])::placeholder { color: var(--muted-foreground); opacity: 1; }
+input:not([type=checkbox]):focus,
+input:not([type=checkbox]):focus-visible {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* Aviso rápido (toast) */
+.toast {
+  pointer-events: none;                    /* não tampa botões que estejam por baixo */
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  bottom: var(--space-6);
+  max-width: min(480px, 92vw);
+  padding: var(--space-3) var(--space-4);
+  background: var(--popover);
+  color: var(--foreground);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-sm);
+  animation: toast-in var(--dur-base) var(--ease);
+}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }

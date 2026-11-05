@@ -1,7 +1,7 @@
 'use strict';
 const {
   app, BrowserWindow, ipcMain, session, desktopCapturer, clipboard, shell, Tray, Menu, nativeImage, powerSaveBlocker,
-  utilityProcess, MessageChannelMain, screen,
+  utilityProcess, MessageChannelMain, screen, nativeTheme,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -105,10 +105,35 @@ function wireInputPort() {
   win.webContents.postMessage('input-port', null, [port2]);
 }
 
+/* ---------- Tema (só visual) ---------- */
+// Preferência: 'dark' (padrão), 'light' ou 'system'. Fica em um arquivo próprio porque o processo principal precisa dela ANTES
+// de a página existir (cor de fundo da janela, sem flash branco). `nativeTheme.themeSource` também faz o Chromium repassar o
+// tema à página como prefers-color-scheme, que é o que o CSS (ui/app.css) usa.
+const THEMES = ['dark', 'light', 'system'];
+const themeFile = () => path.join(app.getPath('userData'), 'theme.json');
+let themePref = 'dark';
+try { const p = JSON.parse(fs.readFileSync(themeFile(), 'utf8')).pref; if (THEMES.includes(p)) themePref = p; } catch {}
+nativeTheme.themeSource = themePref;
+const TITLEBAR_H = 40;   // mesma altura do cabeçalho da interface (--titlebar em ui/app.css)
+// Mesmas cores dos tokens --background e --foreground de ui/app.css.
+const chromeColors = () => (nativeTheme.shouldUseDarkColors
+  ? { bg: '#0d0f12', symbol: '#e8eaee' }
+  : { bg: '#f6f7f9', symbol: '#0f1217' });
+const overlayOptions = () => { const c = chromeColors(); return { color: c.bg, symbolColor: c.symbol, height: TITLEBAR_H }; };
+function applyChromeTheme() {
+  const c = chromeColors();
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w.isDestroyed()) continue;
+    try { w.setBackgroundColor(c.bg); w.setTitleBarOverlay(overlayOptions()); } catch {}
+  }
+}
+nativeTheme.on('updated', applyChromeTheme);
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1100, height: 720, minWidth: 820, minHeight: 560,
-    backgroundColor: '#14161a', title: 'REA Desk', show: !startHidden,
+    backgroundColor: chromeColors().bg, title: 'REA Desk', show: false,   // só aparece em ready-to-show (sem flash)
+    titleBarStyle: 'hidden', titleBarOverlay: overlayOptions(),           // o cabeçalho da interface vira a barra de título
     icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -117,6 +142,7 @@ function createWindow() {
     },
   });
   win.setMenuBarVisibility(false);
+  win.once('ready-to-show', () => { if (!startHidden) win.show(); });
   // Avisos do próprio Windows (mais confiáveis que os eventos da página): minimizou, escondeu ou perdeu o foco.
   for (const ev of ['minimize', 'hide', 'blur']) win.on(ev, () => win.webContents.send('lost-focus'));
   win.on('restore', () => win.webContents.send('window-back'));
@@ -129,7 +155,8 @@ function createWindow() {
         action: 'allow',
         overrideBrowserWindowOptions: {
           width: 1100, height: 700, minWidth: 480, minHeight: 360, title: 'REA Desk – segundo monitor', icon: iconPath,
-          backgroundColor: '#000000', autoHideMenuBar: true,
+          backgroundColor: chromeColors().bg, autoHideMenuBar: true,
+          titleBarStyle: 'hidden', titleBarOverlay: overlayOptions(),
           webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false },
         },
       };
@@ -196,6 +223,15 @@ app.whenReady().then(() => {
   if (process.env.REA_TEST_MONITORS_FILE) fs.watchFile(process.env.REA_TEST_MONITORS_FILE, { interval: 200 }, onTopology);   // só testes
   // O Chromium grava o localStorage em disco com atraso; o renderer pede a gravação logo após mudanças importantes
   // (histórico, nome, código), para não perder dados se o programa for encerrado à força.
+  // Tema da interface (novo canal, só visual): a página lê e muda a preferência; o resto reage a nativeTheme.
+  ipcMain.handle('theme-get', () => ({ pref: themePref, dark: nativeTheme.shouldUseDarkColors }));
+  ipcMain.handle('theme-set', (_e, pref) => {
+    if (!THEMES.includes(pref)) return { pref: themePref, dark: nativeTheme.shouldUseDarkColors };
+    themePref = pref; nativeTheme.themeSource = pref;
+    try { fs.writeFileSync(themeFile(), JSON.stringify({ pref })); } catch {}
+    applyChromeTheme();
+    return { pref: themePref, dark: nativeTheme.shouldUseDarkColors };
+  });
   ipcMain.handle('flush-storage', () => { try { session.defaultSession.flushStorageData(); } catch {} return true; });
   ipcMain.handle('monitors-get', (_e, reset) => {
     refreshMonitors(false);

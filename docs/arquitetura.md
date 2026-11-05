@@ -1,13 +1,13 @@
 # Arquitetura
 
-Aplicativo Electron (Windows) com uma interface em HTML/JS e módulos de lógica pura testáveis fora do Electron.
+Aplicativo Electron (Windows) com uma interface em HTML/CSS/JS e módulos de lógica pura testáveis fora do Electron.
 
 ## Processos e arquivos
 
 | Parte | Arquivo(s) | Função |
 |---|---|---|
 | Processo principal | `src/main.js` | Janela, bandeja, instância única, captura de tela (`desktopCapturer`), monitores (`screen`), ajuste da janela, ponte (IPC) com a interface |
-| Interface | `src/renderer/` | Telas, WebRTC (conexão, vídeo, canal de dados), histórico, exibição, conversa. `renderer.js` é o arquivo principal |
+| Interface | `src/renderer/`, `ui/` | Telas, WebRTC (conexão, vídeo, canal de dados), histórico, exibição, conversa. `renderer.js` é o arquivo principal; o visual (CSS, ícones, fonte) vem de `ui/` (veja "Interface (visual)") |
 | Injetor de entrada | `src/injector.js`, `src/input.js` | Processo separado (`utilityProcess`) que injeta mouse e teclado com `SendInput` (via `koffi`) e esconde o ponteiro |
 | Servidor de conexão | `server/server.js`, `src/net.js` | Apresenta um computador ao outro; embutido no app (rede local) ou hospedado (internet) |
 | Atualizador | `src/updater.js`, `src/watchdog.ps1` | `electron-updater` com backup, vigia e rollback |
@@ -16,6 +16,28 @@ Aplicativo Electron (Windows) com uma interface em HTML/JS e módulos de lógica
 **Por que a entrada roda em outro processo:** um clique remoto nos botões da barra de título da própria janela (minimizar, maximizar, fechar)
 faz o Windows esperar o botão ser solto. Se a injeção ficasse no processo principal, quem solta o botão seria o mesmo processo que está
 esperando, e mouse e teclado remotos travariam. A janela fala com o injetor por um `MessagePort` direto, sem passar pelo processo principal.
+
+## Interface (visual)
+
+A interface é HTML e JS puros (sem framework). O visual vem de arquivos gerados por `npm run build:ui` (script `scripts/build-ui.js`) em
+`src/renderer/assets/` (ignorada pelo git; `npm start`, `npm run dist` e o pipeline de publicação chamam o build sozinhos).
+
+| Fonte | Gera | Conteúdo |
+|---|---|---|
+| `ui/app.css` + `ui/*.css` | `assets/app.css` | Tailwind v4 (só o tema e os utilitários, sem o reset), **tokens** e um CSS por área: `shell` (barra de título), `components`, `home`, `states`, `session`, `dialog`, `viewwin` |
+| `ui/entry.js` | `assets/ui.js` | Ícones **Lucide** (só os usados) e **Motion** (animações de entrada), expostos como `window.REA_UI` |
+| `@fontsource-variable/inter` | `assets/fonts/` | Fonte Inter copiada para o pacote; nada vem de CDN |
+
+- **Tokens:** variáveis CSS com os nomes do shadcn/ui (`--background`, `--surface`, `--border`, `--primary`…), escala de texto, espaçamento
+  (base 4 px), raios (8, 10 e 12 px), sombras e tempos de animação. `scripts/test-contrast.js` confere o contraste dos tokens (AA) nos dois temas.
+- **Tema:** escuro (padrão), claro ou do sistema. A preferência fica em `%APPDATA%\rea-desk\theme.json`, lida pelo processo principal, que
+  ajusta `nativeTheme.themeSource`; o Chromium repassa isso à página como `prefers-color-scheme`, que é o que o CSS usa. Canais IPC
+  `theme-get` e `theme-set` (só visuais).
+- **Janela:** `titleBarStyle: 'hidden'` com `titleBarOverlay` (botões nativos do Windows com as cores do tema, altura 40 px), cor de fundo
+  conforme o tema e exibição em `ready-to-show`, para não piscar em branco ao abrir. O cabeçalho da interface é a barra de título e arrasta
+  a janela.
+- **CSP:** continua `style-src 'self'; script-src 'self'`; nada é inline.
+- **Movimento:** transições de 150 a 250 ms; com `prefers-reduced-motion` as animações ficam instantâneas (o anel de "conectando" gira mais devagar).
 
 ## Conexão
 
@@ -101,7 +123,7 @@ pasta de instalação, então sobrevivem às atualizações.
 | `myId`, `name`, `welcomed` | Código, nome do computador, boas-vindas já vistas |
 | `server`, `stun` | Servidor de conexão e STUN personalizados (vazio = automático) |
 | `history` | Computadores acessados (JSON, até 20) |
-| `viewMode`, `autoFit`, `chatHidden` | Exibição, ajuste da janela, conversa escondida |
+| `viewMode`, `autoFit`, `chatHidden`, `dockCollapsed` | Exibição, ajuste da janela, conversa escondida, barra de controles recolhida |
 | `dataVersion` | Versão do formato dos dados |
 
 **Migração:** `src/renderer/migrations.js`. Para mudar o formato de algum dado, aumente `CURRENT` e acrescente um passo. Os passos só ajustam ou

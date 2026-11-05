@@ -12,6 +12,39 @@ controle de mouse e teclado e a transferência de arquivos e textos. Toda conex�
 Na bandeja do sistema, fechar a janela não encerra o programa (ele continua pronto para receber pedidos); o menu do ícone tem
 "Encerrar acesso remoto agora". Só abre uma janela por vez, e há a opção de abrir junto com o Windows.
 
+## Barra de controles, atalhos e tema
+
+Durante o acesso, os controles ficam numa **barra flutuante** sobre a imagem (também aparece em tela cheia). Os botões têm só ícone; o nome
+aparece ao passar o mouse. O botão **⌃** no canto recolhe a barra (sobra um indicador de qualidade, **Encerrar** e **⌄** para abrir de novo);
+a escolha é lembrada.
+
+| Controle | O que faz |
+|---|---|
+| **Controlar** (interruptor) | Liga ou solta o mouse e o teclado no outro computador |
+| Ponteiro (interruptor) | Mostra ou esconde o mouse do outro computador |
+| **1 2 …** | Escolhe o monitor (só aparece com mais de um) |
+| Janela com seta | Abre outro monitor em uma segunda janela |
+| Setas circulares | **Atualizar imagem** |
+| Pranchetas | **Copiar texto para lá** e **Trazer texto de lá** |
+| Clipe | **Enviar arquivo** |
+| Moldura / setas | **Ajustar janela** e exibição reduzida ou esticada |
+| Balão | Mostrar ou ocultar a conversa (com contador de novas mensagens) |
+| Quatro cantos | Tela cheia |
+| Teclado | Lista de atalhos |
+
+**Qualidade da conexão:** quatro barrinhas e o atraso em ms (verde, amarelo ou vermelho); a dica mostra também quadros por segundo,
+resolução e taxa de dados.
+
+**Atalhos** (`Ctrl+Alt+Shift` + letra; não são enviados ao outro computador): `F` tela cheia, `C` conversa, `V` exibição, `M` usar ou soltar
+mouse e teclado, `B` recolher a barra, `K` lista de atalhos. `Esc` sai da tela cheia. Com **Controlar** ligado, todas as outras teclas vão
+para o outro computador.
+
+**Tema:** o botão de lua, sol ou monitor no cabeçalho alterna entre **escuro** (padrão), **claro** e **do sistema**; a escolha vale na próxima
+abertura. Quem pediu "reduzir movimento" no Windows não vê animações (o anel de "conectando" continua girando, mais devagar).
+
+**Teclado nas janelas de diálogo:** o foco vai para o campo ou botão certo (no pedido de acesso, **Não permitir**), `Tab` não sai da janela e
+`Esc` fecha as configurações, cancela uma confirmação ou recusa um pedido de acesso.
+
 ## Texto, arquivos e conversa
 
 - **Copiar texto para lá / Trazer texto de lá:** copia o texto da área de transferência entre os dois computadores.
@@ -20,14 +53,13 @@ Na bandeja do sistema, fechar a janela não encerra o programa (ele continua pro
 
 ### Ocultar / mostrar a conversa
 
-O botão **Ocultar conversa** (barra de cima) esconde o painel e a imagem do outro computador passa a ocupar a janela toda; **Mostrar conversa**
+O botão de balão da barra (**Ocultar conversa** / **Mostrar conversa**) esconde o painel e a imagem do outro computador passa a ocupar a janela toda; **Mostrar conversa**
 o traz de volta. Mensagens que chegam com a conversa escondida não se perdem: aparece um contador no botão (e um aviso discreto na primeira) e,
-ao mostrar, elas estão no histórico da conversa. A escolha é lembrada. Em janelas com menos de 760 px de largura a conversa já fica escondida e
-o botão não aparece.
+ao mostrar, elas estão no histórico da conversa. A escolha é lembrada. Em janelas com menos de 760 px de largura a conversa fica escondida.
 
 ## Exibição da tela: reduzida ou esticada
 
-O botão **Exibição: reduzida / esticada** (só quem controla) alterna como a tela do outro computador aparece na janela:
+O botão de exibição (**reduzida / esticada**; só quem controla) alterna como a tela do outro computador aparece na janela:
 
 - **Reduzida** (padrão): só **diminui**, quando a imagem é maior que a janela, e **nunca amplia**. Se a janela for maior, a imagem fica no
   tamanho real (1 pixel remoto = 1 pixel do seu monitor, já descontada a escala do Windows), centralizada e nítida, com barras pretas em volta.
@@ -58,7 +90,7 @@ código novo, remova o item antigo e conecte com o código novo.
 
 ## Vários monitores
 
-Se o computador controlado tem mais de um monitor, a barra de quem controla mostra **Monitor: 1 2 …**. Clicar em um número troca a imagem
+Se o computador controlado tem mais de um monitor, a barra de quem controla mostra os botões de monitor **1 2 …**. Clicar em um número troca a imagem
 na hora, **sem reconectar**, e o mouse passa a ser mapeado para aquele monitor (deslocamentos, coordenadas negativas, resoluções e escalas de
 DPI diferentes). Só o monitor escolhido é capturado (menos banda e CPU). Com um único monitor nada aparece e tudo funciona como antes. Se um
 monitor for conectado ou desconectado, ou mudar de resolução ou orientação durante o acesso, a lista é atualizada; se o monitor que estava
@@ -73,7 +105,7 @@ codifica duas imagens ao mesmo tempo (mais CPU e banda); o limite é uma janela 
 
 ## Mostrar ou esconder o mouse do outro computador
 
-A opção **Mostrar o mouse do outro computador** (quem controla): desmarcada, o ponteiro some da imagem. Como o ponteiro vai embutido no vídeo,
+O interruptor do ponteiro (**Mostrar o mouse do outro computador**, quem controla): desmarcada, o ponteiro some da imagem. Como o ponteiro vai embutido no vídeo,
 ele é escondido no próprio computador controlado (os ponteiros do Windows ficam transparentes), e quem está lá vê um aviso com o botão
 **Mostrar meu mouse**. O ponteiro volta ao encerrar o acesso, ao sair do programa, e no próximo início se o programa for encerrado à força;
 o menu da bandeja também tem "Mostrar o ponteiro do mouse". Programas que desenham o próprio ponteiro (alguns jogos e editores) continuam

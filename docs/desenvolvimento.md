@@ -11,7 +11,8 @@
 | Comando | O que faz |
 |---|---|
 | `npm install` | Instala as dependências (inclui o Electron) |
-| `npm start` | Abre o aplicativo a partir do código-fonte |
+| `npm run build:ui` | Gera o CSS, os ícones e a fonte da interface em `src/renderer/assets/` (roda sozinho antes de `npm start` e `npm run dist`) |
+| `npm start` | Abre o aplicativo a partir do código-fonte (gera a interface antes) |
 | `npm run server` | Servidor de conexão avulso (`127.0.0.1:8787`; veja [conexao.md](conexao.md)) |
 | `npm test` | Roda todos os testes (abaixo) |
 | `npm run dist` | Gera o instalador: `dist\REA-Desk-Instalar-<versão>.exe` (~116 MB, com Electron e bibliotecas) |
@@ -33,6 +34,7 @@
 | `scripts/test-monitors.js` | Conversão de coordenadas, seleção de monitor e hot-plug com topologias sintéticas |
 | `scripts/test-history.js` | Histórico de computadores acessados |
 | `scripts/test-viewmode.js` | Cálculo do tamanho da imagem (reduzida / esticada) |
+| `scripts/test-contrast.js` | Contraste das cores do design system (`ui/app.css`) nos temas escuro e claro |
 
 O repositório não tem testes automatizados da interface; a conexão completa foi verificada à mão e com scripts descartáveis.
 
@@ -40,7 +42,9 @@ O repositório não tem testes automatizados da interface; a conexão completa f
 
 ```
 src/                  processo principal, injetor, servidor embutido, atualizador, vigia
-  renderer/           interface (index.html, renderer.js, style.css) e lógica pura (history, viewmode, migrations)
+  renderer/           interface (index.html, renderer.js) e lógica pura (history, viewmode, migrations)
+    assets/           GERADA por npm run build:ui (CSS, ícones, fonte); não vai para o git
+ui/                   design system: tokens e CSS por tela (app.css e parciais), ícones e animações (entry.js)
 server/server.js      servidor de conexão (também usado pelo Dockerfile)
 scripts/              testes e ferramentas de build/lançamento
 config/defaults.json  servidor de conexão e STUN embutidos no instalador

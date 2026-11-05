@@ -6,3 +6,6 @@ dist-local/
 
 # análise local do AnyDesk instalado neste PC (não publicar)
 docs/rea-analysis/
+
+# arquivos visuais gerados por `npm run build:ui`
+src/renderer/assets/

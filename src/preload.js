@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld('rea', {
     onState: (cb) => ipcRenderer.on('update-state', (_e, s) => cb(s)),
   },
   flushStorage: () => ipcRenderer.invoke('flush-storage'),
+  theme: {
+    get: () => ipcRenderer.invoke('theme-get'),
+    set: (pref) => ipcRenderer.invoke('theme-set', pref),
+  },
   fitWindow: (w, h) => ipcRenderer.invoke('fit-window', w, h),
   monitors: {
     get: (reset) => ipcRenderer.invoke('monitors-get', !!reset),

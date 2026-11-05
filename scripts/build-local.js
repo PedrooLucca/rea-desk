@@ -14,6 +14,10 @@ const version = args.find((a) => /^\d+\.\d+\.\d+$/.test(a));
 const broken = args.includes('--broken');
 if (!version) { console.error('uso: node scripts/build-local.js <versão, ex.: 0.3.1> [--broken]'); process.exit(1); }
 
+// A interface depende dos arquivos gerados em src/renderer/assets (CSS, ícones, fonte).
+const ui = spawnSync(process.execPath, [path.join(root, 'scripts', 'build-ui.js')], { stdio: 'inherit' });
+if (ui.status !== 0) process.exit(ui.status || 1);
+
 const stage = path.join(root, '.local-build');
 fs.rmSync(stage, { recursive: true, force: true });
 fs.mkdirSync(stage);

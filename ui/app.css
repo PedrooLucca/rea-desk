@@ -1,0 +1,236 @@
+/*
+  REA Desk — design system.
+  Fonte da verdade dos tokens visuais. Compilado por `npm run build:ui` para src/renderer/assets/app.css.
+  Convenção dos nomes: a mesma do shadcn/ui (background, foreground, card, muted, border, primary...).
+  Tema escuro é o padrão; o claro vale com [data-theme="light"] ou, sem escolha manual, quando o sistema está no claro.
+*/
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./base.css";
+@import "./shell.css";
+@import "./components.css";
+@import "./home.css";
+@import "./states.css";
+@import "./session.css";
+@import "./dialog.css";
+@import "./viewwin.css";
+
+/* ---------- Fonte (Inter, empacotada localmente; nada vem de CDN) ---------- */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("fonts/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ---------- Tokens que não mudam com o tema ---------- */
+:root {
+  color-scheme: dark;
+
+  /* Tipografia */
+  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+  --text-display: 40px;
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Espaçamento (base 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Cantos */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* Alvos de clique e animação */
+  --hit: 36px;           /* altura padrão de controles (mínimo exigido: 32px) */
+  --hit-sm: 32px;
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-slow: 250ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Camadas */
+  --z-bar: 5;
+  --z-modal: 10;
+  --z-toast: 20;
+}
+
+/* ---------- Tema escuro (padrão) ---------- */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0d0f12;
+  --surface: #14171b;            /* cartões e painéis */
+  --surface-2: #1a1e24;          /* itens dentro de cartões, campos */
+  --popover: #181c21;            /* modais, menus, toasts */
+  --border: #252a32;
+  --border-strong: #343a45;
+  --input: #11141a;
+  --foreground: #e8eaee;
+  --muted-foreground: #8e97a6;   /* 6:1 sobre --background */
+  --primary: #2563eb;            /* texto branco: 5,2:1 */
+  --primary-hover: #1d4fd8;
+  --primary-foreground: #ffffff;
+  --primary-soft: rgba(59, 130, 246, 0.14);
+  --ring: #6ea0ff;
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.14);
+  --warning: #f5a524;
+  --warning-soft: rgba(245, 165, 36, 0.14);
+  --destructive: #dc2626;        /* fundo de botão; texto branco: 4,8:1 */
+  --destructive-hover: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #f87171;   /* texto/ícone de erro sobre fundo escuro */
+  --destructive-soft: rgba(248, 113, 113, 0.14);
+  --overlay: rgba(4, 6, 9, 0.64);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.55);
+  --stage: #000000;              /* fundo da imagem remota */
+}
+
+/* ---------- Tema claro ---------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --popover: #ffffff;
+  --border: #e1e5ea;
+  --border-strong: #cdd3db;
+  --input: #ffffff;
+  --foreground: #0f1217;
+  --muted-foreground: #5a6372;   /* 5,9:1 sobre branco */
+  --primary: #2563eb;
+  --primary-hover: #1d4fd8;
+  --primary-foreground: #ffffff;
+  --primary-soft: rgba(37, 99, 235, 0.1);
+  --ring: #2563eb;
+  --success: #046a4b;
+  --success-soft: rgba(4, 106, 75, 0.1);
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.1);
+  --destructive: #dc2626;
+  --destructive-hover: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #b91c1c;
+  --destructive-soft: rgba(185, 28, 28, 0.08);
+  --overlay: rgba(15, 18, 23, 0.4);
+  --shadow-sm: 0 1px 2px rgba(15, 18, 23, 0.08);
+  --shadow-md: 0 6px 20px rgba(15, 18, 23, 0.1);
+  --shadow-lg: 0 18px 48px rgba(15, 18, 23, 0.16);
+}
+
+/* Sem escolha manual, segue o sistema (o Electron repassa o tema do Windows como prefers-color-scheme). */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --background: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f1f3f6;
+    --popover: #ffffff;
+    --border: #e1e5ea;
+    --border-strong: #cdd3db;
+    --input: #ffffff;
+    --foreground: #0f1217;
+    --muted-foreground: #5a6372;
+    --primary: #2563eb;
+    --primary-hover: #1d4fd8;
+    --primary-soft: rgba(37, 99, 235, 0.1);
+    --ring: #2563eb;
+    --success: #046a4b;
+    --success-soft: rgba(4, 106, 75, 0.1);
+    --warning: #b45309;
+    --warning-soft: rgba(180, 83, 9, 0.1);
+    --destructive-hover: #b91c1c;
+    --destructive-text: #b91c1c;
+    --destructive-soft: rgba(185, 28, 28, 0.08);
+    --overlay: rgba(15, 18, 23, 0.4);
+    --shadow-sm: 0 1px 2px rgba(15, 18, 23, 0.08);
+    --shadow-md: 0 6px 20px rgba(15, 18, 23, 0.1);
+    --shadow-lg: 0 18px 48px rgba(15, 18, 23, 0.16);
+  }
+}
+
+/* ---------- Tokens disponíveis como utilitários Tailwind (bg-surface, text-muted, rounded-lg...) ---------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-popover: var(--popover);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/* ---------- Base mínima (o resto é por tela, nas Etapas 3 a 5) ---------- */
+html {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  font-feature-settings: "cv11", "ss03";   /* a de uma andar só e formas mais abertas */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Foco visível por teclado, igual em tudo. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Quem pede menos movimento (Windows: Configurações > Acessibilidade) não vê animações. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

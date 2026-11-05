@@ -20,6 +20,12 @@
   escondido, o ponteiro também some para quem está no computador controlado.
 - **Imagem parada sem controle:** sem controlar, ou com o ponteiro remoto escondido, um travamento real não é detectado sozinho; use
   **Atualizar imagem**.
+- **Barra de controles:** a barra flutuante cobre uns 50 px do topo da imagem do outro computador; recolha-a (`Ctrl+Alt+Shift+B`) para ver tudo.
+- **Atalhos do programa:** `Ctrl+Alt+Shift` + letra não é repassado ao outro computador, mas os três modificadores chegam lá antes da letra.
+  Se o outro computador usa essa combinação para algo, os atalhos ficam indisponíveis para o programa que a usa.
+- **Contraste da interface:** textos, ícones e o foco passam no nível AA (conferido por `npm test`); as bordas dos campos são discretas (cerca
+  de 1,6:1), abaixo dos 3:1 que o WCAG pede para o contorno de componentes.
+- **Receber arquivo:** a pergunta "Deseja receber?" ainda usa a janela padrão do navegador (trocá-la exigiria mudar o recebimento do arquivo).
 - **Histórico:** guarda o código do outro computador; se ele ganhar um código novo (reinstalação), o item antigo precisa ser removido.
 
 ## O que foi testado

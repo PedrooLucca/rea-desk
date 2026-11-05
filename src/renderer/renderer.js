@@ -32,11 +32,47 @@ const digits = (s) => String(s).replace(/\D/g, '');
 const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
 const who = () => peerName || 'A outra pessoa';
 
-function toast(msg, ms = 4500) {
+// kind: '' (informação), 'ok' (deu certo) ou 'error' (algo falhou): muda só a aparência.
+function toast(msg, ms = 4500, kind = '') {
   const t = $('#toast');
-  t.textContent = msg; t.hidden = false;
+  t.className = 'toast' + (kind ? ' ' + kind : '');
+  const span = document.createElement('span'); span.textContent = msg;
+  if (kind) {
+    const i = document.createElement('i'); i.setAttribute('data-lucide', kind === 'error' ? 'triangle-alert' : 'check');
+    t.replaceChildren(i, span);
+    try { window.REA_UI.icons(t); } catch {}
+  } else t.replaceChildren(span);
+  t.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  t.hidden = false;
   clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), ms);
 }
+const toastErr = (msg, ms) => toast(msg, ms, 'error');
+const toastOk = (msg, ms) => toast(msg, ms, 'ok');
+/* ---------- Tema (só visual) ---------- */
+// A preferência (escuro, claro ou do sistema) mora no processo principal; o CSS reage ao prefers-color-scheme que ele repassa.
+const THEME_ORDER = ['dark', 'light', 'system'];
+const THEME_LABEL = { dark: 'Tema escuro', light: 'Tema claro', system: 'Tema do sistema' };
+const THEME_ICON = { dark: 'moon', light: 'sun', system: 'monitor' };
+let themePref = 'dark';
+function paintTheme() {
+  const b = $('#btnTheme'); if (!b) return;
+  const label = `${THEME_LABEL[themePref]}. Clique para trocar.`;
+  b.title = label; b.setAttribute('aria-label', label);
+  const i = document.createElement('i'); i.setAttribute('data-lucide', THEME_ICON[themePref]);
+  b.replaceChildren(i);
+  try { window.REA_UI.icons(b); } catch {}
+}
+$('#btnTheme').onclick = async () => {
+  const next = THEME_ORDER[(THEME_ORDER.indexOf(themePref) + 1) % THEME_ORDER.length];
+  try { themePref = (await window.rea.theme.set(next)).pref; } catch {}
+  paintTheme();
+};
+(async () => {
+  try { window.REA_UI.icons(); } catch {}
+  try { themePref = (await window.rea.theme.get()).pref; } catch {}
+  paintTheme();
+})();
+
 function homeMsg(text, ok = false) { const m = $('#homeMsg'); m.textContent = text; m.className = 'msg' + (ok ? ' ok' : ''); }
 function log(text, cls = '') {
   const d = document.createElement('div');
@@ -48,7 +84,7 @@ function log(text, cls = '') {
 function setStatus(kind) {
   const c = $('#conn');
   if (kind === 'on') { c.textContent = 'Pronto para usar'; c.className = 'pill on'; }
-  else if (kind === 'wait') { c.textContent = 'Conectando…'; c.className = 'pill off'; }
+  else if (kind === 'wait') { c.textContent = 'Conectando…'; c.className = 'pill wait'; }
   else { c.textContent = 'Sem conexão – tentando de novo'; c.className = 'pill off'; }
 }
 function showBanner(text) { const b = $('#banner'); b.textContent = text || ''; b.hidden = !text; }
@@ -74,7 +110,7 @@ async function connectWS() {
     if (sock !== ws) return;
     setStatus('off');
     offlineTimer ||= setTimeout(() => showBanner('Não conseguimos conectar. Verifique se este computador está ligado à internet ou ao Wi-Fi. Vamos continuar tentando sozinhos.'), 8000);
-    if (peerId) { toast('A conexão com o outro computador foi interrompida.'); reset(); }
+    if (peerId) { toastErr('A conexão com o outro computador foi interrompida.'); reset(); }
     scheduleReconnect();
   };
   sock.onerror = () => {};
@@ -115,7 +151,7 @@ function onSignal(m) {
       preparePC();
       showSession(true);
       videoTimer = setTimeout(() => {
-        toast('Não foi possível completar a conexão. Peça para a outra pessoa tentar de novo ou verifique a internet dos dois computadores.', 8000);
+        toastErr('Não foi possível completar a conexão. Peça para a outra pessoa tentar de novo ou verifique a internet dos dois computadores.', 8000);
         endSession(true);
       }, 25000);
       break;
@@ -139,12 +175,12 @@ function preparePC() {
   pc.onicecandidate = (e) => e.candidate && send({ t: 'sig', to: peerId, data: { ice: e.candidate } });
   pc.onconnectionstatechange = () => {
     const s = pc?.connectionState;
-    if (s === 'connected') clearTimeout(dropTimer);
+    if (s === 'connected') { clearTimeout(dropTimer); showLinkLost(false); }
     else if (s === 'disconnected') {
-      clearTimeout(dropTimer);
-      dropTimer = setTimeout(() => { toast('A conexão caiu. Tente conectar novamente.'); endSession(true); }, 6000);
+      clearTimeout(dropTimer); showLinkLost(true);
+      dropTimer = setTimeout(() => { toastErr('A conexão caiu. Tente conectar novamente.'); endSession(true); }, 6000);
     } else if (s === 'failed' || s === 'closed') {
-      if (peerId) { toast('A conexão caiu. Tente conectar novamente.'); endSession(true); }
+      if (peerId) { toastErr('A conexão caiu. Tente conectar novamente.'); endSession(true); }
     }
   };
   if (role === 'controller') {
@@ -165,7 +201,7 @@ async function startHost() {
   try {
     localStream = await captureMonitor(monState.selected);
   } catch {
-    toast('Não foi possível compartilhar a tela deste computador. Feche o programa, abra de novo e tente outra vez.', 8000);
+    toastErr('Não foi possível compartilhar a tela deste computador. Feche o programa, abra de novo e tente outra vez.', 8000);
     return endSession(true);
   }
   primaryStreamId = localStream.id;           // é por este id que o controlador reconhece a janela principal (não muda com replaceTrack)
@@ -242,9 +278,9 @@ async function onDC(m) {
     case 'clip':
       if (role === 'host') {
         if (!perms.files) return;
-        await window.rea.writeClipboard(m.text); toast('Texto recebido. Agora é só colar (Ctrl+V).');
+        await window.rea.writeClipboard(m.text); toastOk('Texto recebido. Agora é só colar (Ctrl+V).');
       } else {
-        await window.rea.writeClipboard(m.text); toast('Texto trazido. Agora é só colar (Ctrl+V).');
+        await window.rea.writeClipboard(m.text); toastOk('Texto trazido. Agora é só colar (Ctrl+V).');
       }
       break;
     case 'clipreq':
@@ -264,7 +300,7 @@ async function onDC(m) {
         for (const p of rx.parts) { buf.set(new Uint8Array(p), o); o += p.byteLength; }
         await window.rea.saveFile(rx.name, buf);
         log(`Arquivo recebido: ${rx.name}`, 'sys');
-        toast('Arquivo salvo na pasta Downloads, dentro de "REA-Desk-Recebidos".');
+        toastOk('Arquivo salvo na pasta Downloads, dentro de "REA-Desk-Recebidos".');
         rx = null;
       }
       break;
@@ -278,13 +314,13 @@ function onFileChunk(buf) {
 }
 
 async function sendFile(file) {
-  if (!dc || dc.readyState !== 'open') return toast('Ainda não há conexão com o outro computador.');
+  if (!dc || dc.readyState !== 'open') return toastErr('Ainda não há conexão com o outro computador.');
   if (role === 'host' && !perms.files) return;
-  if (file.size > MAX_FILE) return toast('Este arquivo é muito grande (o limite é 200 MB).');
+  if (file.size > MAX_FILE) return toastErr('Este arquivo é muito grande (o limite é 200 MB).');
   dsend({ k: 'file', name: file.name, size: file.size });
   log(`Enviando "${file.name}"…`, 'sys');
   for (let off = 0; off < file.size; off += CHUNK) {
-    if (!dc || dc.readyState !== 'open') return toast('O envio foi interrompido porque a conexão caiu.');
+    if (!dc || dc.readyState !== 'open') return toastErr('O envio foi interrompido porque a conexão caiu.');
     if (dc.bufferedAmount > (4 << 20)) {
       await new Promise((r) => { dc.onbufferedamountlow = () => { dc.onbufferedamountlow = null; r(); }; });
     }
@@ -306,10 +342,20 @@ function showSession(waiting) {
   $('#btnFull').hidden = host; $('#btnView').hidden = host; $('#btnFit').hidden = host;
   $('#btnFile').hidden = host && !perms.files;
   $('#btnEnd').hidden = false;
+  $('#linkQ').hidden = host;
   $('#remote').hidden = host;
   window.rea.sessionState(true);
 }
 
+// Aviso visual de conexão instável (só aparência; quem decide encerrar é o temporizador acima).
+function showLinkLost(on) { const e = $('#linkLost'); if (e) e.hidden = !on; }
+// Confirmação rápida de que a imagem do outro computador chegou.
+function flashConnected() {
+  const e = $('#connFlash'); if (!e) return;
+  $('#connFlashName').textContent = who();
+  e.hidden = true; void e.offsetWidth; e.hidden = false;
+  clearTimeout(flashConnected.t); flashConnected.t = setTimeout(() => (e.hidden = true), 3200);
+}
 function endSession(notify) {
   if (notify && peerId) send({ t: 'bye', to: peerId });
   reset();
@@ -318,6 +364,8 @@ function reset() {
   clearTimeout(callTimer); clearTimeout(videoTimer); clearTimeout(dropTimer);
   if (role === 'host') { try { window.rea.input({ k: 'cursor', show: true }); } catch {} } // nunca deixar o mouse escondido
   $('#cursorNote').hidden = true; $('#curToggle').checked = true;
+  showLinkLost(false); { const e = $('#connFlash'); if (e) e.hidden = true; }
+  paintQuality(null); setKeysOpen(false);
   try { window.rea.releaseInput(); } catch {}
   try { dc?.close(); } catch {}
   try { pc?.close(); } catch {}
@@ -409,7 +457,7 @@ function unregisterVideo(t) { try { t.ro.disconnect(); } catch {} }
 const mainVideoView = registerVideo(video, $('#viewWrap'), window);
 function updateViewButtons() {
   const text = VM.label(viewMode);
-  $('#btnView').textContent = text; $('#btnView').title = VM.HELP;
+  $('#btnView .lbl').textContent = text; $('#btnView').title = VM.HELP + ' (Ctrl+Alt+Shift+V)';
   $('#btnView').setAttribute('aria-pressed', String(viewMode === 'shrink'));
   if (view2 && view2.win && !view2.win.closed) { const b = view2.win.document.getElementById('viewBtn2'); if (b) { b.textContent = text; b.title = VM.HELP; } }
 }
@@ -512,7 +560,7 @@ function hostViewOp(m) {
         if (valid && !extraView) await hostOpenView(id);
         else if (valid && extraView.monitor !== id) await hostSetView(id);
       }
-    } catch (err) { console.error('janela extra', err); toast('Não foi possível mostrar o segundo monitor agora.'); }
+    } catch (err) { console.error('janela extra', err); toastErr('Não foi possível mostrar o segundo monitor agora.'); }
     hostSendMonitors();
   });
 }
@@ -548,7 +596,7 @@ async function hostSwitchMonitor(id) {
       monState = { list: r.list, selected: r.selected, rev: r.rev };
       if (r.changed) {
         try { await applyCapture(); }
-        catch (err) { console.error('troca de monitor', err); toast('Não foi possível trocar o monitor agora. Tente de novo.'); }
+        catch (err) { console.error('troca de monitor', err); toastErr('Não foi possível trocar o monitor agora. Tente de novo.'); }
       }
       hostSendMonitors();
       if (pendingSelect == null) break;
@@ -563,7 +611,7 @@ window.rea.monitors.onChanged(async (s) => {
   if (role !== 'host' || !pc) return;
   if (switching) await switching.catch(() => {});
   if (s.recapture) {                                                  // o monitor transmitido mudou ou sumiu
-    try { await applyCapture(); } catch (err) { console.error('recaptura', err); toast('A tela mudou e não foi possível atualizar a imagem. Use "Atualizar imagem".'); }
+    try { await applyCapture(); } catch (err) { console.error('recaptura', err); toastErr('A tela mudou e não foi possível atualizar a imagem. Use "Atualizar imagem".'); }
   }
   // janela extra: se o monitor dela sumiu (ou passou a ser o da janela principal), fecha; se mudou de resolução/orientação, captura de novo
   let viewLost = false;
@@ -588,7 +636,7 @@ function onMonitors(m) {
     assignStreams();
   }
   renderMonitors();
-  if (m.reason === 'lost') toast('O monitor que você estava vendo foi desconectado. Agora você vê o monitor principal.', 6000);
+  if (m.reason === 'lost') toastErr('O monitor que você estava vendo foi desconectado. Agora você vê o monitor principal.', 6000);
   else if (m.reason === 'changed' && !m.viewLost) toast('A configuração dos monitores do outro computador mudou.', 4000);
 }
 // Liga cada stream recebido à janela certa (principal ou extra).
@@ -599,7 +647,7 @@ function assignStreams() {
     if (!st) continue;
     if (v.slot === 1 && $('#remote').srcObject !== st) {
       clearTimeout(videoTimer);
-      $('#remote').srcObject = st; $('#waiting').hidden = true; $('#remote').focus();
+      $('#remote').srcObject = st; $('#waiting').hidden = true; $('#remote').focus(); flashConnected();
     }
     if (v.slot === 2 && view2 && view2.video.srcObject !== st) { view2.video.srcObject = st; view2.video.play().catch(() => {}); }
   }
@@ -632,10 +680,10 @@ function openViewWindow() {
   if (!target) return;
   let w = null;
   try { w = window.open('about:blank', 'rea-view-2'); } catch {}
-  if (!w) return toast('Não foi possível abrir a segunda janela.');
+  if (!w) return toastErr('Não foi possível abrir a segunda janela.');
   const d = w.document;
   d.title = 'REA Desk – segundo monitor';
-  const css = d.createElement('link'); css.rel = 'stylesheet'; css.href = new URL('style.css', location.href).href; d.head.append(css);
+  const css2 = d.createElement('link'); css2.rel = 'stylesheet'; css2.href = new URL('assets/app.css', location.href).href; d.head.append(css2);   // tokens, tema e barra de título
   d.body.className = 'viewwin';
   const bar = d.createElement('div'); bar.className = 'bar';
   const info = d.createElement('span'); info.id = 'info';
@@ -664,7 +712,7 @@ function openViewWindow() {
     renderMonitors();
   });
   dsend({ k: 'view', op: 'open', id: target.id });
-  setTimeout(() => { if (view2 && view2.win === w && view2.pending) { closeViewWindow(); toast('O outro computador não conseguiu abrir o segundo monitor.', 6000); } }, 10000);
+  setTimeout(() => { if (view2 && view2.win === w && view2.pending) { closeViewWindow(); toastErr('O outro computador não conseguiu abrir o segundo monitor.', 6000); } }, 10000);
   renderMonitors();
 }
 function closeViewWindow() {
@@ -800,6 +848,125 @@ $('#btnChat').onclick = () => setChatHidden(!chatHidden);
 applyChat();
 updateViewButtons();      // (depois da declaração de view2)
 
+/* ---------- Barra flutuante: recolher, atalhos e qualidade da conexão (só aparência; nada aqui mexe na conexão) ---------- */
+let dockCollapsed = store.get('dockCollapsed', '0') === '1';
+function applyDock() {
+  $('#dock').classList.toggle('collapsed', dockCollapsed);
+  const b = $('#btnDock');
+  b.setAttribute('aria-expanded', String(!dockCollapsed));
+  b.title = (dockCollapsed ? 'Abrir a barra' : 'Recolher a barra') + ' (Ctrl+Alt+Shift+B)';
+  b.querySelector('.lbl').textContent = dockCollapsed ? 'Abrir barra' : 'Recolher barra';
+  const i = document.createElement('i'); i.setAttribute('data-lucide', dockCollapsed ? 'chevron-down' : 'chevron-up');
+  b.replaceChildren(i, Object.assign(document.createElement('span'), { className: 'lbl', textContent: dockCollapsed ? 'Abrir barra' : 'Recolher barra' }));
+  try { window.REA_UI.icons(b); } catch {}
+  if (dockCollapsed) setKeysOpen(false);
+}
+function setDockCollapsed(v) { dockCollapsed = v; store.set('dockCollapsed', v ? '1' : '0'); applyDock(); }
+$('#btnDock').onclick = () => { setDockCollapsed(!dockCollapsed); if (role === 'controller' && controlling()) video.focus(); };
+applyDock();
+
+function setKeysOpen(open) {
+  $('#keysPop').hidden = !open;
+  $('#btnKeys').setAttribute('aria-expanded', String(open));
+}
+$('#btnKeys').onclick = () => setKeysOpen($('#keysPop').hidden);
+document.addEventListener('mousedown', (e) => { if (!$('#keysPop').hidden && !e.target.closest('#keysPop, #btnKeys')) setKeysOpen(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#keysPop').hidden) setKeysOpen(false); });
+// Atalhos do programa: Ctrl+Alt+Shift + letra. Rodam ANTES do teclado ser enviado ao outro computador e não são repassados.
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey && e.altKey && e.shiftKey) || $('#session').hidden) return;
+  const acts = {
+    KeyF: () => !$('#btnFull').hidden && $('#btnFull').click(),
+    KeyC: () => $('#btnChat').click(),
+    KeyV: () => !$('#btnView').hidden && $('#btnView').click(),
+    KeyM: () => !$('#ctlWrap').hidden && $('#ctlToggle').click(),
+    KeyB: () => $('#btnDock').click(),
+    KeyK: () => $('#btnKeys').click(),
+  };
+  const act = acts[e.code];
+  if (!act) return;
+  e.preventDefault(); e.stopPropagation();
+  act();
+}, true);
+
+const fmtNum = (n, d = 0) => n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+function paintQuality(q) {
+  const el = $('#linkQ'), ms = $('#linkMs'), det = $('#linkDetail');
+  if (!q || q.rtt == null) {
+    el.dataset.level = 'none'; ms.textContent = '—';
+    el.title = q ? 'Qualidade da conexão: medindo…' : 'Qualidade da conexão';
+    det.textContent = q ? 'Medindo a conexão…' : '';
+    return;
+  }
+  const level = q.rtt < 60 && (q.fps == null || q.fps >= 12) ? 4 : q.rtt < 120 ? 3 : q.rtt < 250 ? 2 : 1;
+  el.dataset.level = String(level);
+  ms.textContent = Math.round(q.rtt) + ' ms';
+  const parts = [`Atraso ${Math.round(q.rtt)} ms`];
+  if (q.fps) parts.push(`${Math.round(q.fps)} quadros/s`);
+  if (q.w && q.h) parts.push(`${q.w}×${q.h}`);
+  if (q.kbps != null) parts.push(q.kbps >= 1000 ? `${fmtNum(q.kbps / 1000, 1)} Mbps` : `${Math.round(q.kbps)} kbps`);
+  const txt = parts.join(' · ');
+  el.title = 'Qualidade da conexão: ' + ['', 'ruim', 'regular', 'boa', 'ótima'][level] + '. ' + txt;
+  det.textContent = 'Agora: ' + txt;
+}
+let qPrev = null;
+async function pollQuality() {
+  if (role !== 'controller' || !pc || pc.connectionState !== 'connected') { if (qPrev) paintQuality(null); qPrev = null; return; }
+  let rtt = null, fps = null, w = 0, h = 0, bytes = 0, ts = 0;
+  try {
+    (await pc.getStats()).forEach((r) => {
+      if (r.type === 'candidate-pair' && r.state === 'succeeded' && (r.nominated || r.selected) && typeof r.currentRoundTripTime === 'number') rtt = r.currentRoundTripTime * 1000;
+      if (r.type === 'inbound-rtp' && r.kind === 'video') { fps = r.framesPerSecond ?? null; w = r.frameWidth || 0; h = r.frameHeight || 0; bytes = r.bytesReceived || 0; ts = r.timestamp || 0; }
+    });
+  } catch { return; }
+  const kbps = qPrev && ts > qPrev.ts ? ((bytes - qPrev.bytes) * 8) / (ts - qPrev.ts) : null;   // bits / ms = kbit/s
+  qPrev = { bytes, ts };
+  paintQuality({ rtt, fps, w, h, kbps });
+}
+setInterval(pollQuality, 2000);
+
+/* ---------- Diálogos: confirmação, foco e teclado (só interface) ---------- */
+// Confirmação no estilo do programa (no lugar do confirm() do navegador, que não combina com o tema).
+function askConfirm(title, text, yesLabel) {
+  return new Promise((resolve) => {
+    $('#cfTitle').textContent = title; $('#cfText').textContent = text; $('#cfYes').textContent = yesLabel;
+    const done = (v) => { $('#confirm').hidden = true; $('#cfYes').onclick = $('#cfNo').onclick = null; resolve(v); };
+    $('#cfYes').onclick = () => done(true); $('#cfNo').onclick = () => done(false);
+    $('#confirm').hidden = false;
+  });
+}
+// Ao abrir um diálogo o foco vai para o controle indicado (data-autofocus) ou o primeiro; ao fechar, volta para onde estava.
+const modalFocusables = (root) => [...root.querySelectorAll('button, input, summary')].filter((e) => !e.disabled && e.type !== 'hidden' && e.offsetParent !== null);
+for (const m of document.querySelectorAll('.modal')) {
+  new MutationObserver(() => {
+    if (!m.hidden && !m._open) {
+      m._open = true; m._prev = document.activeElement;
+      setTimeout(() => { const t = m.querySelector('[data-autofocus]') || modalFocusables(m)[0]; if (t) { t.focus(); if (t.select && t.tagName === 'INPUT') t.select(); } }, 0);
+    } else if (m.hidden && m._open) {
+      m._open = false; const p = m._prev;
+      if (p && p.isConnected && p.offsetParent !== null) setTimeout(() => p.focus(), 0);
+    }
+  }).observe(m, { attributes: true, attributeFilter: ['hidden'] });
+}
+const MODAL_ESC = { incoming: '#inDeny', settings: '#cfgCancel', confirm: '#cfNo' };   // Esc aciona este botão (boas-vindas não fecha)
+document.addEventListener('keydown', (e) => {
+  const open = [...document.querySelectorAll('.modal')].filter((m) => !m.hidden).pop();
+  if (!open) return;
+  if (e.key === 'Escape') { const b = MODAL_ESC[open.id]; if (b) { e.preventDefault(); $(b).click(); } return; }
+  if (e.key !== 'Tab') return;
+  const f = modalFocusables(open); if (!f.length) return;
+  const first = f[0], last = f[f.length - 1], a = document.activeElement;
+  if (!open.contains(a)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+}, true);
+
+// Troca de tela (início <-> sessão): entrada suave. Só aparência; quem mostra e esconde as telas continua sendo o código acima.
+for (const [id, y] of [['#home', 8], ['#session', 0]]) {
+  const el = $(id);
+  new MutationObserver(() => { if (!el.hidden) { try { window.REA_UI.enter(el, { y }); } catch {} } }).observe(el, { attributes: true, attributeFilter: ['hidden'] });
+}
+
 /* ---------- Botões ---------- */
 function startCall(id) {
   if (id.length !== 9) return homeMsg('Digite os 9 números do código que a outra pessoa informou.');
@@ -831,9 +998,10 @@ function setHistBusy(b) { document.querySelector('.hist').classList.toggle('busy
 function rememberDevice(id, name) { devHist = HIST.record(devHist, id, name); saveHistory(); renderHistory(); }
 function connectFromHistory(id) { $('#remoteId').value = fmtId(id); homeMsg(''); startCall(id); }
 
-function histButton(cls, text, title, onclick) {
+function histButton(cls, icon, title, onclick) {
   const b = document.createElement('button');
-  b.type = 'button'; b.className = cls; b.textContent = text; b.title = title; b.setAttribute('aria-label', title); b.onclick = onclick;
+  b.type = 'button'; b.className = cls; b.title = title; b.setAttribute('aria-label', title); b.onclick = onclick;
+  const i = document.createElement('i'); i.setAttribute('data-lucide', icon); b.append(i);
   return b;
 }
 function renderHistory() {
@@ -859,17 +1027,20 @@ function renderHistory() {
     main.type = 'button'; main.className = 'hist-main'; main.title = `Conectar a ${name}`;
     const n = document.createElement('span'); n.className = 'hist-name'; n.textContent = name;
     const sub = document.createElement('span'); sub.className = 'hist-sub'; sub.textContent = `${HIST.fmtCode(e.id)} · ${HIST.timeAgo(e.lastAt)}`;
-    main.append(n, sub);
+    const ico = document.createElement('span'); ico.className = 'hist-ico'; const ic = document.createElement('i'); ic.setAttribute('data-lucide', 'laptop'); ico.append(ic);
+    const txt = document.createElement('span'); txt.className = 'hist-text'; txt.append(n, sub);
+    main.append(ico, txt);
     main.onclick = () => connectFromHistory(e.id);
     li.append(main,
-      histButton('hist-act' + (e.fav ? ' fav' : ''), e.fav ? '★' : '☆', e.fav ? 'Tirar dos favoritos' : 'Marcar como favorito', () => { devHist = HIST.toggleFavorite(devHist, e.id); saveHistory(); renderHistory(); }),
-      histButton('hist-act', '✎', 'Renomear', () => { editingId = e.id; renderHistory(); }),
-      histButton('hist-act', '✕', 'Remover do histórico', () => { devHist = HIST.remove(devHist, e.id); saveHistory(); renderHistory(); }));
+      histButton('hist-act' + (e.fav ? ' fav' : ''), 'star', e.fav ? 'Tirar dos favoritos' : 'Marcar como favorito', () => { devHist = HIST.toggleFavorite(devHist, e.id); saveHistory(); renderHistory(); }),
+      histButton('hist-act', 'pencil', 'Renomear', () => { editingId = e.id; renderHistory(); }),
+      histButton('hist-act', 'x', 'Remover do histórico', () => { devHist = HIST.remove(devHist, e.id); saveHistory(); renderHistory(); }));
     list.append(li);
   }
+  try { window.REA_UI.icons(list); } catch {}
 }
-$('#histClear').onclick = () => {
-  if (!confirm('Apagar o histórico de computadores acessados?\n\nOs favoritos (★) serão mantidos.')) return;
+$('#histClear').onclick = async () => {
+  if (!(await askConfirm('Apagar o histórico?', 'Os computadores acessados saem da lista. Os favoritos (com estrela) são mantidos.', 'Apagar'))) return;
   devHist = HIST.clearKeepingFavorites(devHist); saveHistory(); renderHistory();
 };
 setInterval(() => { if (editingId === null && !$('#home').hidden) renderHistory(); }, 60000);   // atualiza o "há X min"
@@ -877,7 +1048,11 @@ renderHistory();
 
 $('#remoteId').addEventListener('keydown', (e) => e.key === 'Enter' && $('#btnConnect').click());
 $('#remoteId').addEventListener('input', (e) => (e.target.value = fmtId(digits(e.target.value))));
-$('#copyId').onclick = async () => { await window.rea.writeClipboard(fmtId(myId || '')); toast('Código copiado. Agora é só colar na mensagem para a pessoa.'); };
+$('#copyId').onclick = async () => {
+  await window.rea.writeClipboard(fmtId(myId || ''));
+  toastOk('Código copiado. Agora é só colar na mensagem para a pessoa.');
+  const b = $('#copyId'); b.classList.add('done'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('done'), 1800);   // visual: Copiado + ✓
+};
 
 $('#inAccept').onclick = () => {
   const { from, name } = incoming; incoming = null; $('#incoming').hidden = true;
@@ -897,7 +1072,7 @@ window.rea.onEndRequest(() => endSession(true));
 $('#btnFull').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : $('#viewWrap').requestFullscreen());
 $('#btnFile').onclick = () => $('#fileInput').click();
 $('#fileInput').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) sendFile(f); };
-$('#btnClipSend').onclick = async () => { dsend({ k: 'clip', text: await window.rea.readClipboard() }); toast('Texto enviado. Cole no outro computador com Ctrl+V.'); };
+$('#btnClipSend').onclick = async () => { dsend({ k: 'clip', text: await window.rea.readClipboard() }); toastOk('Texto enviado. Cole no outro computador com Ctrl+V.'); };
 $('#btnClipGet').onclick = () => dsend({ k: 'clipreq' });
 $('#btnRefresh').onclick = () => { requestRefresh(); toast('Atualizando a imagem…', 2000); };
 $('#chatForm').onsubmit = (e) => {
@@ -966,7 +1141,7 @@ $('#btnSettings').onclick = async () => {
 $('#cfgCancel').onclick = () => ($('#settings').hidden = true);
 $('#cfgSave').onclick = async () => {
   const s = $('#cfgServer').value.trim();
-  if (s && !/^wss?:\/\//.test(s)) return toast('O endereço do servidor deve começar com ws:// ou wss://. Se não tiver certeza, deixe em branco.');
+  if (s && !/^wss?:\/\//.test(s)) return toastErr('O endereço do servidor deve começar com ws:// ou wss://. Se não tiver certeza, deixe em branco.');
   myName = $('#cfgName').value.trim() || myName;
   store.set('name', myName);
   const changed = s !== cfg.server;
@@ -975,7 +1150,7 @@ $('#cfgSave').onclick = async () => {
   await window.rea.setAutostart($('#cfgAuto').checked);
   store.set('autoFit', $('#cfgAutoFit').checked ? '1' : '0');
   $('#settings').hidden = true;
-  toast('Configurações salvas.');
+  toastOk('Configurações salvas.');
   if (changed) { if (ws) { ws.onclose = null; ws.close(); } connectWS(); }
 };
 

@@ -2,6 +2,14 @@
 
 Mais recente primeiro. Os instaladores e as notas de cada versão ficam em [Releases](https://github.com/PedrooLucca/rea-desk/releases).
 
+## Próxima versão (ainda não lançada)
+
+- **Novo visual:** tema escuro (padrão), claro e do sistema, cantos arredondados, acento azul, fonte Inter, ícones Lucide e animações curtas
+  (respeitam "reduzir movimento"). Barra de título própria, sem flash branco ao abrir.
+- **Sessão remota:** barra de controles flutuante e recolhível, indicador de qualidade e atraso, atalhos `Ctrl+Alt+Shift` + letra e lista de atalhos.
+- **Estados de conexão** com retorno visual (conectando, conectado, reconectando, erro) e diálogos novos (foco, `Tab` preso, `Esc`).
+- Só a interface mudou; conexão, rede, captura de tela e os canais IPC existentes seguem iguais (há dois canais novos, só do tema).
+
 ## 0.5.1
 
 - **Corrige o piscar da imagem.** O vigia de "imagem congelada" recolocava o vídeo na tela quando a tela remota estava parada (e a cada foco ou
