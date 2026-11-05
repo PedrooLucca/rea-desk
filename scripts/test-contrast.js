@@ -5,7 +5,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const css = fs.readFileSync(path.join(__dirname, '..', 'ui', 'app.css'), 'utf8');
+// (o git do Windows pode entregar o arquivo com CRLF; normaliza para não depender disso)
+const css = fs.readFileSync(path.join(__dirname, '..', 'ui', 'app.css'), 'utf8').replace(/\r\n/g, '\n');
 
 function block(startMarker) {
   const i = css.indexOf(startMarker);

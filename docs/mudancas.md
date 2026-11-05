@@ -2,12 +2,14 @@
 
 Mais recente primeiro. Os instaladores e as notas de cada versão ficam em [Releases](https://github.com/PedrooLucca/rea-desk/releases).
 
-## 0.6.0
+## 0.6.1 (inclui o conteúdo da 0.6.0, que não chegou a ser publicada)
 
 - **Novo visual:** tema escuro (padrão), claro e do sistema, cantos arredondados, acento azul, fonte Inter, ícones Lucide e animações curtas
   (respeitam "reduzir movimento"). Barra de título própria, sem flash branco ao abrir.
 - **Sessão remota:** barra de controles flutuante e recolhível, indicador de qualidade e atraso, atalhos `Ctrl+Alt+Shift` + letra e lista de atalhos.
 - **Estados de conexão** com retorno visual (conectando, conectado, reconectando, erro) e diálogos novos (foco, `Tab` preso, `Esc`).
+- **Pipeline:** o teste de contraste dependia da quebra de linha do arquivo e falhou no Windows do GitHub (CRLF); por isso a 0.6.0 não foi
+  publicada e esta versão a substitui.
 - Só a interface mudou; conexão, rede, captura de tela e os canais IPC existentes seguem iguais (há dois canais novos, só do tema).
 
 ## 0.5.1
