@@ -32,9 +32,9 @@ console.log(`Versão atual: ${current}\nNova versão:  ${next}${dry ? '   (simul
 
 let inRepo = true;
 try { git('rev-parse', '--is-inside-work-tree'); } catch { inRepo = false; }
-if (!inRepo) die('esta pasta ainda não é um repositório git ligado ao GitHub. Veja LANCAR-VERSAO.md (passo "uma vez só").');
+if (!inRepo) die('esta pasta ainda não é um repositório git ligado ao GitHub. Rode: git init, git add -A, git commit, git remote add origin <url-do-repositorio> e git push -u origin main.');
 if (git('status', '--porcelain')) die('há alterações não salvas (commit). Salve ou descarte-as antes de lançar.');
-if (!git('remote')) die('o repositório não tem um destino no GitHub (remote). Veja LANCAR-VERSAO.md.');
+if (!git('remote')) die('o repositório não tem um destino no GitHub (remote). Rode: git remote add origin <url-do-repositorio> e git push -u origin main.');
 const tag = `v${next}`;
 if (git('tag', '--list', tag)) die(`a etiqueta ${tag} já existe.`);
 

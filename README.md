@@ -28,7 +28,12 @@ Para testar o código sem empacotar: `npm start`. Testes do servidor: `npm test`
 A partir da 0.3.0 o programa se atualiza sozinho (GitHub Releases + `electron-updater`): procura ao abrir e a cada 4 horas,
 baixa só o que mudou, mostra "Nova versão disponível. Atualizar agora ou depois?" (ou instala sozinho correções pequenas),
 instala sem pedir administrador, mantém os dados do usuário, e faz **rollback automático** se a versão nova não abrir.
-Como lançar versões e como testar localmente: **[LANCAR-VERSAO.md](LANCAR-VERSAO.md)** (um comando: `npm run release -- patch`).
+Para lançar uma versão, um comando: `npm run release -- patch` (ou `minor` / `major` / um número como `1.0.1`). Ele roda os testes, cria o commit e a
+etiqueta e envia ao GitHub; o GitHub Actions (`.github/workflows/release.yml`) compila, assina (se houver certificado nos *Secrets*
+`WIN_CSC_LINK` e `WIN_CSC_KEY_PASSWORD`) e publica em *Releases*. O repositório de destino fica em `package.json`, bloco `build > publish`.
+Para testar o fluxo de atualização sem publicar: `npm run update:build-local -- 1.0.0` (e outra versão maior), `npm run update:serve-local` e
+instalar o `REA Desk Teste` gerado em `dist-local\` (usa outra identidade e outra pasta de dados, sem mexer na instalação real);
+`--broken` gera uma versão que fecha ao abrir, para testar o rollback.
 
 ## Exibição da tela: esticada ou reduzida
 
@@ -149,6 +154,6 @@ O computador controlado codifica duas imagens ao mesmo tempo (mais CPU e banda);
 - Atualização automática: a primeira instalação continua manual e a versão instalada já precisa conter o atualizador (0.3.0 ou
   mais nova). Sem assinatura digital, a atualização é verificada só pelo checksum (`sha512`) publicado junto, e o Windows pode bloquear
   o `.exe` novo (Controle de Aplicativo); o rollback automático cobre falhas de abertura, mas não um bloqueio do próprio Windows na
-  reabertura. É preciso configurar o seu repositório do GitHub (veja LANCAR-VERSAO.md).
+  reabertura. É preciso configurar o seu repositório do GitHub (`package.json`, bloco `build > publish`).
 - Testado: servidor, e fluxo completo (pedido, aceite, vídeo, mouse, teclado, texto, arquivo, chat, encerramento) com o `.exe` empacotado em duas instâncias no mesmo PC. **Não** testado: o instalador em si (instalar/desinstalar), dois computadores reais, nem acesso pela internet.
 - O REA (ferramenta de engenharia reversa) foi usado só para uma inspeção estática do AnyDesk instalado (binário empacotado, sem tabela de imports); a saída fica local e não faz parte do app nem do repositório.
