@@ -721,42 +721,57 @@ async function refreshHostVideo() {
   } catch (err) { console.error('refresh', err); }
   refreshing = false;
 }
-// Controlador: pede imagem nova ao outro computador e recoloca o vídeo na tela.
-let lastRefresh = 0;
-function requestRefresh(force = false) {
+// ATENÇÃO (piscar): recolocar o vídeo na tela (srcObject = null; srcObject = stream) faz o navegador esvaziar e recarregar a imagem,
+// e isso aparece como um piscar. Por isso há duas ações separadas, e a segunda é rara:
+//   requestKeyframe(): só PEDE um quadro novo ao outro computador (não mexe no vídeo da tela; não pisca)
+//   reattachVideo():   recoloca o vídeo na tela (pode piscar). Só no botão "Atualizar imagem", ao voltar de uma janela minimizada
+//                      e quando o pedido de quadro novo não resolveu uma imagem realmente congelada.
+let lastKeyframe = 0;
+function requestKeyframe(force = false) {
   if (role !== 'controller' || !video.srcObject) return;
   const now = Date.now();
-  if (!force && now - lastRefresh < 8000) return;
-  lastRefresh = now;
+  if (!force && now - lastKeyframe < 8000) return;
+  lastKeyframe = now;
+  dsend({ k: 'refresh' });
+}
+function reattachVideo() {
+  if (role !== 'controller' || !video.srcObject) return;
   const s = video.srcObject;
   video.srcObject = null; video.srcObject = s;
   video.play().catch(() => {});
-  dsend({ k: 'refresh' });
 }
-// Vigia: se o usuário está mexendo o mouse sobre a imagem e ela não muda há 4 s, pede imagem nova.
-let wdFrames = -1, wdChangedAt = Date.now(), lastPointer = 0;
-video.addEventListener('mousemove', () => { lastPointer = Date.now(); });
+function requestRefresh() { reattachVideo(); requestKeyframe(true); }          // botão "Atualizar imagem"
+
+// Vigia de imagem congelada. Só vale quando o usuário está CONTROLANDO com o ponteiro remoto VISÍVEL: aí cada movimento do mouse
+// faz o ponteiro remoto mexer e gera quadros novos; se mesmo assim a imagem não muda por 4 s, ela travou de verdade.
+// (Sem controle, ou com o ponteiro remoto escondido, uma tela parada é normal e NÃO é sinal de travamento.)
+let wdFrames = -1, wdChangedAt = Date.now(), lastPointer = 0, wdStrikes = 0;
+video.addEventListener('mousemove', () => { if (controlling() && $('#curToggle').checked) lastPointer = Date.now(); });
 setInterval(async () => {
-  if (role !== 'controller' || !pc || pc.connectionState !== 'connected' || !video.srcObject) { wdFrames = -1; return; }
+  if (role !== 'controller' || !pc || pc.connectionState !== 'connected' || !video.srcObject) { wdFrames = -1; wdStrikes = 0; return; }
   let n = 0;
   try { (await pc.getStats()).forEach((r) => { if (r.type === 'inbound-rtp' && r.kind === 'video') n = r.framesDecoded; }); } catch { return; }
   const now = Date.now();
-  if (n !== wdFrames) { wdFrames = n; wdChangedAt = now; return; }
-  if (now - wdChangedAt > 4000 && now - lastPointer < 3000) { wdChangedAt = now; requestRefresh(); }
+  if (n !== wdFrames) { wdFrames = n; wdChangedAt = now; wdStrikes = 0; return; }
+  if (now - wdChangedAt > 4000 && now - lastPointer < 3000) {
+    wdChangedAt = now; wdStrikes++;
+    requestKeyframe();                                      // 1ª vez: só pede quadro novo (não pisca)
+    if (wdStrikes >= 2) { wdStrikes = 0; reattachVideo(); } // não resolveu: recoloca o vídeo (último recurso)
+  }
 }, 1500);
 
-// Ao voltar para a janela (restaurar/minimizar), garante que o vídeo continue rodando e o teclado volte ao controle.
-function wake() {
+// Voltar para a janela: o vídeo continua rodando e o teclado volta ao controle. Só reencaixa o vídeo depois de uma janela
+// REALMENTE minimizada/escondida; foco e redimensionamento comuns não recarregam nada.
+function wake(reattach = false) {
   if (role !== 'controller' || !video.srcObject) return;
   video.play().catch(() => {});
   if ($('#ctlToggle').checked) video.focus();
-  requestRefresh();
+  if (reattach) { reattachVideo(); requestKeyframe(); }
 }
 window.rea.onLostFocus(releaseRemote);
-window.rea.onWindowBack(() => setTimeout(wake, 100));
-document.addEventListener('visibilitychange', wake);
-window.addEventListener('focus', wake);
-window.addEventListener('resize', wake);
+window.rea.onWindowBack(() => setTimeout(() => wake(true), 100));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(true); });
+window.addEventListener('focus', () => wake(false));
 video.addEventListener('pause', () => { if (role === 'controller' && video.srcObject) video.play().catch(() => {}); });
 
 /* ---------- Ocultar / mostrar a conversa ---------- */
@@ -884,7 +899,7 @@ $('#btnFile').onclick = () => $('#fileInput').click();
 $('#fileInput').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) sendFile(f); };
 $('#btnClipSend').onclick = async () => { dsend({ k: 'clip', text: await window.rea.readClipboard() }); toast('Texto enviado. Cole no outro computador com Ctrl+V.'); };
 $('#btnClipGet').onclick = () => dsend({ k: 'clipreq' });
-$('#btnRefresh').onclick = () => { requestRefresh(true); toast('Atualizando a imagem…', 2000); };
+$('#btnRefresh').onclick = () => { requestRefresh(); toast('Atualizando a imagem…', 2000); };
 $('#chatForm').onsubmit = (e) => {
   e.preventDefault();
   const t = $('#chatText').value.trim(); if (!t) return;
