@@ -2,6 +2,12 @@
 
 Mais recente primeiro. Os instaladores e as notas de cada versão ficam em [Releases](https://github.com/PedrooLucca/rea-desk/releases).
 
+## 0.7.0
+
+- **Área de transferência compartilhada:** o que for copiado em um computador pode ser colado no outro, nos dois sentidos e sem botões (texto).
+  Respeita a permissão **Arquivos e textos** e não envia o que já estava copiado antes do acesso. Os botões **Copiar texto para lá** e **Trazer texto de lá**
+  deixaram de existir (a sincronização é sempre automática, sem botão de pausa).
+
 ## 0.6.1 (inclui o conteúdo da 0.6.0, que não chegou a ser publicada)
 
 - **Novo visual:** tema escuro (padrão), claro e do sistema, cantos arredondados, acento azul, fonte Inter, ícones Lucide e animações curtas

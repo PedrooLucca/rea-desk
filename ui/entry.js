@@ -3,14 +3,14 @@
 import {
   createIcons, X, Copy, Check, Settings, Sun, Moon, Monitor, Star, Pencil, Trash2, ArrowRight, Clock, Laptop, ShieldCheck,
   ShieldAlert, Info, TriangleAlert, LoaderCircle, Wifi, WifiOff,
-  MousePointerClick, MousePointer2, ExternalLink, RefreshCw, ClipboardCopy, ClipboardPaste, Paperclip, Scan, Minimize2, Maximize2,
+  MousePointerClick, MousePointer2, ExternalLink, RefreshCw, Paperclip, Scan, Minimize2, Maximize2,
   MessageSquare, Maximize, Keyboard, ChevronUp, ChevronDown, Power,
 } from 'lucide';
 import { animate } from 'motion';
 
 const icons = {
   X, Copy, Check, Settings, Sun, Moon, Monitor, Star, Pencil, Trash2, ArrowRight, Clock, Laptop, ShieldCheck, ShieldAlert, Info, TriangleAlert, LoaderCircle, Wifi, WifiOff,
-  MousePointerClick, MousePointer2, ExternalLink, RefreshCw, ClipboardCopy, ClipboardPaste, Paperclip, Scan, Minimize2, Maximize2,
+  MousePointerClick, MousePointer2, ExternalLink, RefreshCw, Paperclip, Scan, Minimize2, Maximize2,
   MessageSquare, Maximize, Keyboard, ChevronUp, ChevronDown, Power,
 };
 

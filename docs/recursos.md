@@ -25,7 +25,6 @@ a escolha é lembrada.
 | **1 2 …** | Escolhe o monitor (só aparece com mais de um) |
 | Janela com seta | Abre outro monitor em uma segunda janela |
 | Setas circulares | **Atualizar imagem** |
-| Pranchetas | **Copiar texto para lá** e **Trazer texto de lá** |
 | Clipe | **Enviar arquivo** |
 | Moldura / setas | **Ajustar janela** e exibição reduzida ou esticada |
 | Balão | Mostrar ou ocultar a conversa (com contador de novas mensagens) |
@@ -47,7 +46,9 @@ abertura. Quem pediu "reduzir movimento" no Windows não vê animações (o anel
 
 ## Texto, arquivos e conversa
 
-- **Copiar texto para lá / Trazer texto de lá:** copia o texto da área de transferência entre os dois computadores.
+- **Área de transferência compartilhada (automática):** durante o acesso, o que você **copiar** (Ctrl+C) em um computador pode ser **colado**
+  (Ctrl+V) no outro, nos dois sentidos, sem botões e sem avisos. Só texto; o que já estava copiado antes do acesso não é enviado, só o que mudar
+  depois. Quem é acessado só participa se permitiu **Arquivos e textos** no pedido de acesso (sem isso, nada é copiado em nenhum sentido).
 - **Enviar arquivo:** até 200 MB; quem recebe confirma e o arquivo vai para `Downloads\REA-Desk-Recebidos`.
 - **Conversa:** painel ao lado da imagem, nos dois computadores.
 

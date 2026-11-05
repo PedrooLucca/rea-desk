@@ -25,6 +25,11 @@
   Se o outro computador usa essa combinação para algo, os atalhos ficam indisponíveis para o programa que a usa.
 - **Contraste da interface:** textos, ícones e o foco passam no nível AA (conferido por `npm test`); as bordas dos campos são discretas (cerca
   de 1,6:1), abaixo dos 3:1 que o WCAG pede para o contorno de componentes.
+- **Área de transferência automática:** só **texto** (imagens e arquivos copiados não são sincronizados; use **Enviar arquivo**). Cabe em uma
+  mensagem do canal de dados: textos acima de cerca de 250 KB não são enviados e o programa avisa. **Não há botão de pausa**: tudo o que é copiado
+  durante o acesso vai para o outro computador, **inclusive senhas**. Quem é acessado pode desligar negando **Arquivos e textos**; quem controla
+  deve evitar copiar algo sigiloso durante o acesso. O programa olha a área de transferência a cada ~0,6 s, então uma cópia seguida de colar muito
+  rápido pode chegar depois.
 - **Receber arquivo:** a pergunta "Deseja receber?" ainda usa a janela padrão do navegador (trocá-la exigiria mudar o recebimento do arquivo).
 - **Histórico:** guarda o código do outro computador; se ele ganhar um código novo (reinstalação), o item antigo precisa ser removido.
 

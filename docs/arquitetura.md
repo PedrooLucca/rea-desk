@@ -59,11 +59,19 @@ A interface é HTML e JS puros (sem framework). O visual vem de arquivos gerados
 | `monitor` | controlador → host | Trocar o monitor da janela principal |
 | `view` | controlador → host | Janela extra: `op` = `open`, `set` ou `close` |
 | `chat` | os dois | Mensagem de conversa |
-| `clip`, `clipreq` | os dois | Enviar texto / pedir o texto do outro lado (até 1 000 000 caracteres) |
+| `clip`, `clipreq` | os dois | `clip` com `auto: true` é a cópia automática (veja abaixo). Sem `auto` e `clipreq` eram dos botões manuais, que foram removidos; continuam aceitos para versões antigas |
+| `clipsync` | host → controlador | `ok`: o computador controlado permitiu arquivos e textos (se não, o controlador nem envia a cópia automática) |
 | `file`, `fileend` | os dois | Início e fim de um arquivo; os pedaços (16 KB) vão em mensagens binárias, limite de 200 MB |
 
 Mensagens desconhecidas são ignoradas, então versões diferentes continuam funcionando (por exemplo, o botão de segunda janela só aparece se o
 host mandar `views`; sem `mon`, o mouse vai para o monitor selecionado).
+
+## Área de transferência automática
+
+Cada lado lê a própria área de transferência a cada ~0,6 s (`clipPoll` em `renderer.js`, via o canal `clip-read` que já existia) e, se o texto
+mudou, envia `{k:'clip', text, auto:true}`. Quem recebe grava na sua (`clip-write`) e guarda o texto em `clipLast`, que impede o eco de voltar;
+um contador (`clipEpoch`) descarta leituras que ficaram velhas durante a gravação. A primeira leitura da sessão só marca o que já estava copiado.
+O host só participa com `perms.files` e avisa o controlador por `clipsync`; nenhum canal IPC novo.
 
 ## Vários monitores
 

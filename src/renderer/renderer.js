@@ -236,7 +236,7 @@ async function onRtc(d) {
 function setupDC() {
   dc.binaryType = 'arraybuffer';
   dc.bufferedAmountLowThreshold = 1 << 20;
-  dc.onopen = () => { log('Conexão segura estabelecida.', 'sys'); if (role === 'host') hostSendMonitors(); };
+  dc.onopen = () => { log('Conexão segura estabelecida.', 'sys'); if (role === 'host') { hostSendMonitors(); dsend({ k: 'clipsync', ok: !!perms.files }); } };
   dc.onmessage = (e) => {
     if (typeof e.data !== 'string') return onFileChunk(e.data);
     let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -275,7 +275,11 @@ async function onDC(m) {
         if (chatUnread === 1) toast(`Nova mensagem de ${who()}. Clique em "Mostrar conversa" para ler.`, 5000);
       }
       break;
+    case 'clipsync':                                      // o computador controlado diz se a área de transferência é compartilhada
+      if (role === 'controller') clipPeerAllowed = m.ok !== false;
+      break;
     case 'clip':
+      if (m.auto) { await clipApply(m.text); break; }       // cópia automática: sem aviso, só coloca na área de transferência
       if (role === 'host') {
         if (!perms.files) return;
         await window.rea.writeClipboard(m.text); toastOk('Texto recebido. Agora é só colar (Ctrl+V).');
@@ -338,7 +342,7 @@ function showSession(waiting) {
   $('#hostNote').hidden = !host;
   $('#hostPeer').textContent = `${who()} (código ${fmtId(peerId)})`;
   $('#waiting').hidden = host || !waiting;
-  $('#ctlWrap').hidden = host; $('#btnClipGet').hidden = host; $('#btnClipSend').hidden = host; $('#btnRefresh').hidden = host; $('#curWrap').hidden = host;
+  $('#ctlWrap').hidden = host; $('#btnRefresh').hidden = host; $('#curWrap').hidden = host;
   $('#btnFull').hidden = host; $('#btnView').hidden = host; $('#btnFit').hidden = host;
   $('#btnFile').hidden = host && !perms.files;
   $('#btnEnd').hidden = false;
@@ -379,6 +383,7 @@ function reset() {
   $('#btnPopout').hidden = true;
   $('#monPick').hidden = true; $('#monPick').textContent = ''; $('#monNote').hidden = true;
   perms = { control: false, files: false };
+  clipLast = null; clipEpoch++; clipPeerAllowed = true;
   pendingIce = []; hasRemote = false;
   $('#session').hidden = true; $('#home').hidden = false; $('#log').textContent = '';
   chatUnread = 0; applyChat();
@@ -848,6 +853,41 @@ $('#btnChat').onclick = () => setChatHidden(!chatHidden);
 applyChat();
 updateViewButtons();      // (depois da declaração de view2)
 
+/* ---------- Área de transferência compartilhada (texto) ---------- */
+// Durante o acesso, o que for copiado em um computador pode ser colado no outro, nos dois sentidos, sem apertar botão.
+// Cada lado olha a própria área de transferência a cada ~0,6 s; se o texto mudou, manda ao outro, que o coloca na dele.
+// clipLast é o último texto visto ou aplicado aqui: é o que impede o texto recebido de voltar para quem o mandou.
+// O que já estava copiado ANTES do acesso não é enviado (só o que mudar depois). Quem é acessado só participa se permitiu
+// "arquivos e textos". Cabe em uma mensagem do canal de dados (~250 KB); acima disso avisa e não envia.
+const clipIO = { read: () => window.rea.readClipboard(), write: (t) => window.rea.writeClipboard(t) };
+let clipLast = null, clipEpoch = 0, clipBusy = false, clipPeerAllowed = true;
+const clipActive = () => !!dc && dc.readyState === 'open' && (role === 'controller' || (role === 'host' && perms.files));
+async function clipPoll() {
+  if (clipBusy || !clipActive()) return;
+  clipBusy = true;
+  const epoch = clipEpoch;
+  try {
+    const cur = String((await clipIO.read()) ?? '');
+    if (epoch !== clipEpoch) return;                          // chegou texto do outro lado enquanto líamos: o valor lido já é velho
+    if (clipLast === null) { clipLast = cur; return; }        // primeira leitura da sessão: só marca (não envia o que já estava copiado)
+    if (cur === clipLast) return;
+    clipLast = cur;
+    if (cur && (role === 'host' || clipPeerAllowed)) {
+      const json = JSON.stringify({ k: 'clip', text: cur, auto: true });
+      const max = (pc && pc.sctp && pc.sctp.maxMessageSize) || 262144;            // limite de uma mensagem do canal de dados
+      if (new TextEncoder().encode(json).length > Math.min(max, 262144) - 1024) { toastErr('O texto copiado é grande demais para ser compartilhado sozinho (limite de cerca de 250 KB).', 6000); return; }
+      dsend(JSON.parse(json));
+    }
+  } catch {} finally { clipBusy = false; }
+}
+setInterval(clipPoll, 600);
+async function clipApply(text) {                              // texto automático vindo do outro computador
+  if (!clipActive() || typeof text !== 'string') return;
+  text = text.slice(0, 1_000_000);
+  clipEpoch++; clipLast = text;                               // antes de gravar: o próximo olhar não vê isto como "novo"
+  try { await clipIO.write(text); } catch {}
+}
+
 /* ---------- Barra flutuante: recolher, atalhos e qualidade da conexão (só aparência; nada aqui mexe na conexão) ---------- */
 let dockCollapsed = store.get('dockCollapsed', '0') === '1';
 function applyDock() {
@@ -1072,8 +1112,6 @@ window.rea.onEndRequest(() => endSession(true));
 $('#btnFull').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : $('#viewWrap').requestFullscreen());
 $('#btnFile').onclick = () => $('#fileInput').click();
 $('#fileInput').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) sendFile(f); };
-$('#btnClipSend').onclick = async () => { dsend({ k: 'clip', text: await window.rea.readClipboard() }); toastOk('Texto enviado. Cole no outro computador com Ctrl+V.'); };
-$('#btnClipGet').onclick = () => dsend({ k: 'clipreq' });
 $('#btnRefresh').onclick = () => { requestRefresh(); toast('Atualizando a imagem…', 2000); };
 $('#chatForm').onsubmit = (e) => {
   e.preventDefault();
