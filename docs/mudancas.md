@@ -2,7 +2,7 @@
 
 Mais recente primeiro. Os instaladores e as notas de cada versão ficam em [Releases](https://github.com/PedrooLucca/rea-desk/releases).
 
-## Próxima versão (ainda não lançada)
+## 0.6.0
 
 - **Novo visual:** tema escuro (padrão), claro e do sistema, cantos arredondados, acento azul, fonte Inter, ícones Lucide e animações curtas
   (respeitam "reduzir movimento"). Barra de título própria, sem flash branco ao abrir.
