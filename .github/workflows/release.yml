@@ -31,6 +31,17 @@ jobs:
           V="v$(node -p "require('./package.json').version")"
           if [ "$V" != "$GITHUB_REF_NAME" ]; then echo "Etiqueta $GITHUB_REF_NAME diferente da versão $V"; exit 1; fi
 
+      # Cria a Release ANTES de enviar os arquivos. Sem isto, o electron-builder sobe os arquivos em paralelo e cada um tenta
+      # criar a Release, resultando em Releases duplicadas com a mesma etiqueta (e sem o latest.yml na "mais recente").
+      - name: Criar a Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "REA Desk ${GITHUB_REF_NAME#v}" \
+              --notes "REA Desk ${GITHUB_REF_NAME#v}. Para o programa perguntar antes de atualizar, escreva [perguntar] aqui; para atualizar sem perguntar, [silencioso]."
+
       # Compila, assina (se houver certificado nos Secrets), gera o instalador + latest.yml + blockmap e publica na Release.
       - name: Compilar, assinar e publicar
         run: npx electron-builder --win nsis --x64 --publish always
