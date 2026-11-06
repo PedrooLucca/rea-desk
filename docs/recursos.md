@@ -14,7 +14,7 @@ Na bandeja do sistema, fechar a janela não encerra o programa (ele continua pro
 
 ## Barra de controles, atalhos e tema
 
-Durante o acesso, os controles ficam numa **barra flutuante** sobre a imagem (também aparece em tela cheia). Os botões têm só ícone; o nome
+Durante o acesso, os controles ficam numa **barra flutuante** sobre a imagem. Os botões têm só ícone; o nome
 aparece ao passar o mouse. O botão **⌃** no canto recolhe a barra (sobra um indicador de qualidade, **Encerrar** e **⌄** para abrir de novo);
 a escolha é lembrada.
 
@@ -26,16 +26,15 @@ a escolha é lembrada.
 | Janela com seta | Abre outro monitor em uma segunda janela |
 | Setas circulares | **Atualizar imagem** |
 | Clipe | **Enviar arquivo** |
-| Moldura / setas | **Ajustar janela** e exibição reduzida ou esticada |
+| Setas | Exibição reduzida ou esticada |
 | Balão | Mostrar ou ocultar a conversa (com contador de novas mensagens) |
-| Quatro cantos | Tela cheia |
 | Teclado | Lista de atalhos |
 
 **Qualidade da conexão:** quatro barrinhas e o atraso em ms (verde, amarelo ou vermelho); a dica mostra também quadros por segundo,
 resolução e taxa de dados.
 
-**Atalhos** (`Ctrl+Alt+Shift` + letra; não são enviados ao outro computador): `F` tela cheia, `C` conversa, `V` exibição, `M` usar ou soltar
-mouse e teclado, `B` recolher a barra, `K` lista de atalhos. `Esc` sai da tela cheia. Com **Controlar** ligado, todas as outras teclas vão
+**Atalhos** (`Ctrl+Alt+Shift` + letra; não são enviados ao outro computador): `C` conversa, `V` exibição, `M` usar ou soltar
+mouse e teclado, `B` recolher a barra, `K` lista de atalhos. Com **Controlar** ligado, todas as outras teclas vão
 para o outro computador.
 
 **Tema:** o botão de lua, sol ou monitor no cabeçalho alterna entre **escuro** (padrão), **claro** e **do sistema**; a escolha vale na próxima
@@ -74,8 +73,8 @@ ignorados.
 
 Como no AnyDesk, **ao conectar** a janela se redimensiona para caber a tela remota (1 pixel remoto = 1 pixel do seu monitor, mais ~24 px de
 margem de cada lado), limitada à área útil do monitor onde ela está, e é centralizada. Uma tela remota de 1366×768 aparece em 1366×768; uma de
-1920×1080 num monitor 1920×1080 usa toda a área útil e a exibição reduzida a encolhe só o necessário. Janela maximizada ou em tela cheia nunca é
-redimensionada. O botão **Ajustar janela** refaz o ajuste quando quiser, e em **Configurações** dá para desligar o ajuste automático.
+1920×1080 num monitor 1920×1080 usa toda a área útil e a exibição reduzida a encolhe só o necessário. Janela maximizada nunca é
+redimensionada. Em **Configurações** dá para desligar o ajuste automático.
 
 ## Histórico de computadores acessados
 

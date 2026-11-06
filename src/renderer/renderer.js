@@ -343,7 +343,7 @@ function showSession(waiting) {
   $('#hostPeer').textContent = `${who()} (código ${fmtId(peerId)})`;
   $('#waiting').hidden = host || !waiting;
   $('#ctlWrap').hidden = host; $('#btnRefresh').hidden = host; $('#curWrap').hidden = host;
-  $('#btnFull').hidden = host; $('#btnView').hidden = host; $('#btnFit').hidden = host;
+  $('#btnView').hidden = host;
   $('#btnFile').hidden = host && !perms.files;
   $('#btnEnd').hidden = false;
   $('#linkQ').hidden = host;
@@ -389,7 +389,6 @@ function reset() {
   chatUnread = 0; applyChat();
   $('#btnConnect').disabled = false; setHistBusy(false);
   window.rea.sessionState(false);
-  if (document.fullscreenElement) document.exitFullscreen();
 }
 
 /* ---------- Entrada do controlador (mouse/teclado) ---------- */
@@ -490,7 +489,6 @@ async function fitWindowToRemote() {
 }
 async function fitWindowTwice() { await fitWindowToRemote(); await new Promise((r) => setTimeout(r, 450)); await fitWindowToRemote(); }
 video.addEventListener('loadedmetadata', () => { if (fitPending) { fitPending = false; setTimeout(fitWindowTwice, 250); } });
-$('#btnFit').onclick = () => { fitWindowTwice(); if (controlling()) video.focus(); };
 // Ao minimizar / trocar de janela, nada deve ficar pressionado no computador remoto.
 const releaseRemote = () => { if (role === 'controller') dsend({ k: 'release' }); };
 window.addEventListener('blur', releaseRemote);
@@ -694,14 +692,12 @@ function openViewWindow() {
   const info = d.createElement('span'); info.id = 'info';
   const sp = d.createElement('span'); sp.className = 'spacer';
   const pick = d.createElement('span'); pick.className = 'monpick'; pick.id = 'monPick2';
-  const full = d.createElement('button'); full.className = 'ghost'; full.textContent = 'Tela cheia';
   const close = d.createElement('button'); close.className = 'danger'; close.textContent = 'Fechar esta janela';
   const vmode = d.createElement('button'); vmode.className = 'ghost'; vmode.id = 'viewBtn2';
-  bar.append(info, sp, pick, vmode, full, close);
+  bar.append(info, sp, pick, vmode, close);
   const v = d.createElement('video'); v.autoplay = true; v.muted = true; v.playsInline = true; v.tabIndex = 0;
   const area = d.createElement('div'); area.className = 'viewarea'; area.append(v);
   d.body.append(bar, area);
-  full.onclick = () => (d.fullscreenElement ? d.exitFullscreen() : area.requestFullscreen());
   close.onclick = () => w.close();
   vmode.onclick = () => setViewMode(VM.next(viewMode));
   view2 = { win: w, video: v, monitor: target.id, pending: true, closing: false, vt: registerVideo(v, area, w) };
@@ -916,7 +912,6 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#key
 window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey && e.altKey && e.shiftKey) || $('#session').hidden) return;
   const acts = {
-    KeyF: () => !$('#btnFull').hidden && $('#btnFull').click(),
     KeyC: () => $('#btnChat').click(),
     KeyV: () => !$('#btnView').hidden && $('#btnView').click(),
     KeyM: () => !$('#ctlWrap').hidden && $('#ctlToggle').click(),
@@ -1109,7 +1104,6 @@ $('#inDeny').onclick = () => {
 $('#btnEnd').onclick = () => endSession(true);
 $('#btnEndHost').onclick = () => endSession(true);
 window.rea.onEndRequest(() => endSession(true));
-$('#btnFull').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : $('#viewWrap').requestFullscreen());
 $('#btnFile').onclick = () => $('#fileInput').click();
 $('#fileInput').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) sendFile(f); };
 $('#btnRefresh').onclick = () => { requestRefresh(); toast('Atualizando a imagem…', 2000); };

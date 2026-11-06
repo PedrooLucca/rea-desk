@@ -2,6 +2,11 @@
 
 Mais recente primeiro. Os instaladores e as notas de cada versão ficam em [Releases](https://github.com/PedrooLucca/rea-desk/releases).
 
+## 0.7.1
+
+- Saem da barra de controles os botões **Ajustar janela** e **Tela cheia** (e o atalho `Ctrl+Alt+Shift+F`), e também o botão **Tela cheia** da janela do
+  segundo monitor. O ajuste automático da janela ao conectar continua, com a opção nas Configurações.
+
 ## 0.7.0
 
 - **Área de transferência compartilhada:** o que for copiado em um computador pode ser colado no outro, nos dois sentidos e sem botões (texto).
