@@ -1,0 +1,7 @@
+/* Janela do segundo monitor (montada pelo renderer.js com createElement). A barra de título está em shell.css. */
+body.viewwin { display: flex; flex-direction: column; height: 100vh; background: var(--stage); }
+body.viewwin .bar { display: flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; }
+body.viewwin .bar #info { font-size: var(--text-sm); font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.viewwin .bar > button { min-height: var(--hit-sm); height: var(--hit-sm); padding: 0 var(--space-3); font-size: var(--text-sm); }
+body.viewwin .viewarea { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: var(--stage); }
+body.viewwin video { width: 100%; height: 100%; object-fit: contain; background: #000; outline: none; cursor: crosshair; }

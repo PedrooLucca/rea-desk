@@ -1,0 +1,55 @@
+name: Publicar versão
+
+# Dispara quando uma etiqueta de versão (v1.0.1) é enviada. Use `npm run release -- patch` para criar e enviar a etiqueta.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # necessário para criar a Release e anexar os arquivos
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Testes
+        run: npm test
+
+      - name: Conferir que a etiqueta bate com a versão do package.json
+        shell: bash
+        run: |
+          V="v$(node -p "require('./package.json').version")"
+          if [ "$V" != "$GITHUB_REF_NAME" ]; then echo "Etiqueta $GITHUB_REF_NAME diferente da versão $V"; exit 1; fi
+
+      # Cria a Release ANTES de enviar os arquivos. Sem isto, o electron-builder sobe os arquivos em paralelo e cada um tenta
+      # criar a Release, resultando em Releases duplicadas com a mesma etiqueta (e sem o latest.yml na "mais recente").
+      - name: Criar a Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "REA Desk ${GITHUB_REF_NAME#v}" \
+              --notes "REA Desk ${GITHUB_REF_NAME#v}. Para o programa perguntar antes de atualizar, escreva [perguntar] aqui; para atualizar sem perguntar, [silencioso]."
+
+      - name: Gerar CSS, ícones e fonte da interface
+        run: npm run build:ui
+
+      # Compila, assina (se houver certificado nos Secrets), gera o instalador + latest.yml + blockmap e publica na Release.
+      - name: Compilar, assinar e publicar
+        run: npx electron-builder --win nsis --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Opcional (recomendado): certificado de assinatura de código. Sem estes Secrets o instalador sai sem assinatura.
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}

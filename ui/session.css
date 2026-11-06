@@ -1,0 +1,205 @@
+/* Sessão remota: imagem, barra flutuante, indicador de qualidade, atalhos, conversa e tela de quem é acessado. */
+
+#session { display: flex; flex-direction: column; height: calc(100% - var(--titlebar)); }
+.stage { flex: 1; display: flex; min-height: 0; }
+.view { flex: 1; position: relative; min-width: 0; background: var(--stage); }
+.stage.nochat .chat { display: none; }
+
+/* texto só para leitores de tela e dicas (some da barra, mas continua acessível) */
+.lbl {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Barra flutuante ---------- */
+.dock {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  right: var(--space-3);
+  margin-inline: auto;
+  width: fit-content;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: calc(100% - 2 * var(--space-3));
+  padding: var(--space-1);
+  background: color-mix(in srgb, var(--popover) 90%, transparent);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--foreground);
+  animation: dock-in var(--dur-slow) var(--ease);
+}
+@keyframes dock-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+.dock-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-1); min-width: 0; }
+.dock.collapsed .dock-body { display: none; }
+.dock-info { max-width: 180px; padding: 0 var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.dock-sep { width: 1px; height: 18px; margin: 0 var(--space-1); background: var(--border-strong); flex: none; }
+
+button.dock-btn,
+.dock .tbtn,
+button.dock-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: var(--hit-sm);
+  height: var(--hit-sm);
+  min-height: var(--hit-sm);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+button.dock-btn:hover:not(:disabled),
+.dock .tbtn:hover,
+button.dock-toggle:hover:not(:disabled) { background: var(--surface-2); color: var(--foreground); }
+button.dock-btn svg, .dock .tbtn svg, button.dock-toggle svg { width: 17px; height: 17px; flex: none; }
+button.dock-btn[aria-expanded="true"] { background: var(--surface-2); color: var(--foreground); }
+
+/* Interruptores (Controlar, ponteiro remoto): a caixinha fica escondida e o botão mostra o estado */
+.dock .tbtn input { position: absolute; opacity: 0; width: 100%; height: 100%; inset: 0; margin: 0; cursor: pointer; }
+.dock .tbtn:has(input:checked) { background: var(--primary-soft); color: var(--ring); }
+.dock .tbtn:has(input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* botão de exibição: o ícone mostra o modo atual */
+#btnView[aria-pressed="true"] .ic-stretch,
+#btnView[aria-pressed="false"] .ic-shrink { display: none; }
+.dock .badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  padding: 1px 4px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  line-height: 14px;
+  text-align: center;
+  margin: 0;
+}
+
+button.dock-end { height: var(--hit-sm); min-height: var(--hit-sm); padding: 0 var(--space-3); border-radius: var(--radius-sm); font-size: var(--text-sm); }
+
+/* seletor de monitores (barra flutuante e janela do segundo monitor) */
+.monpick { display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--surface-2); border-radius: var(--radius-sm); }
+.dock .monlabel { display: none; }
+.monpick button {
+  min-width: var(--hit-sm);
+  height: var(--hit-sm);
+  min-height: var(--hit-sm);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.monpick button:hover:not(:disabled):not(.on) { background: var(--border); color: var(--foreground); }
+.monpick button.on { background: var(--primary); color: var(--primary-foreground); }
+.monpick button:disabled { opacity: 0.4; }
+
+/* ---------- Qualidade e atraso ---------- */
+.quality { display: inline-flex; white-space: nowrap; align-items: center; gap: 6px; padding: 0 var(--space-2); font-size: var(--text-xs); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+.quality .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.quality .bars i { display: block; width: 3px; border-radius: 1px; background: var(--border-strong); }
+.quality .bars i:nth-child(1) { height: 5px; }
+.quality .bars i:nth-child(2) { height: 8px; }
+.quality .bars i:nth-child(3) { height: 11px; }
+.quality .bars i:nth-child(4) { height: 14px; }
+.quality[data-level="4"] .bars i, .quality[data-level="3"] .bars i:nth-child(-n+3) { background: var(--success); }
+.quality[data-level="2"] .bars i:nth-child(-n+2) { background: var(--warning); }
+.quality[data-level="1"] .bars i:nth-child(1) { background: var(--destructive-text); }
+.quality[data-level="1"] { color: var(--destructive-text); }
+.quality[data-level="2"] { color: var(--warning); }
+
+/* ---------- Atalhos ---------- */
+.popover {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  width: min(380px, calc(100% - 2 * var(--space-3)));
+  padding: var(--space-4) var(--space-5);
+  transform: translate(-50%, -50%);
+  background: var(--popover);
+  color: var(--foreground);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: pop-in var(--dur-base) var(--ease);
+}
+@keyframes pop-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+.popover h3 { margin: 0 0 var(--space-3); font-size: var(--text-lg); font-weight: var(--weight-semibold); }
+.keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.keys li { display: flex; align-items: center; gap: 4px; font-size: var(--text-sm); }
+.keys li span { flex: 1; color: var(--muted-foreground); }
+kbd {
+  min-width: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  text-align: center;
+}
+.popover .hint { margin-top: var(--space-4); }
+.popover .detail { margin: var(--space-3) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+
+/* ---------- Imagem e "Conectado" ---------- */
+video { width: 100%; height: 100%; object-fit: contain; outline: none; cursor: crosshair; }
+.view.shrink { display: flex; align-items: center; justify-content: center; }
+.flash { top: auto; bottom: var(--space-6); }
+@keyframes flash-in {
+  0% { opacity: 0; transform: translate(-50%, 8px); }
+  8%, 85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 4px); }
+}
+
+/* ---------- Quem está sendo acessado ---------- */
+.host-card { max-width: 440px; }
+.host-card > svg { width: 32px; height: 32px; color: var(--ring); }
+.host-card .lead { color: var(--foreground); font-size: var(--text-base); }
+.host-card .sub { color: var(--muted-foreground); font-size: var(--text-sm); }
+.host-card .sub button { margin-top: var(--space-2); }
+.big-btn { margin-top: var(--space-3); min-height: 44px; padding: 0 var(--space-6); font-size: var(--text-base); }
+
+/* ---------- Conversa ---------- */
+.chat { display: flex; flex-direction: column; gap: var(--space-3); width: 300px; padding: var(--space-4); background: var(--surface); border-left: 1px solid var(--border); }
+/* o painel da conversa desliza ao aparecer */
+.stage:not(.nochat) .chat { animation: chat-in var(--dur-slow) var(--ease); }
+@keyframes chat-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.chat-title { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.log { flex: 1; display: flex; flex-direction: column; gap: var(--space-2); overflow: auto; font-size: var(--text-sm); }
+.log div { max-width: 88%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--surface-2); word-break: break-word; align-self: flex-start; }
+.log .me { align-self: flex-end; background: var(--primary-soft); color: var(--foreground); }
+.log .sys { align-self: center; max-width: 100%; padding: 0; background: none; color: var(--muted-foreground); font-size: var(--text-xs); font-style: normal; text-align: center; }
+.chat-form { display: flex; gap: var(--space-2); }
+.chat-form input { flex: 1; min-width: 0; }
+
+@media (max-width: 760px) {
+  .chat { display: none; }
+}
+
+/* janela estreita: o nome do outro computador sai da barra (continua nas dicas) para ela caber em uma linha */
+@media (max-width: 1100px) { .dock-info, .dock-info + .dock-sep { display: none; } }

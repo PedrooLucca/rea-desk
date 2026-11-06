@@ -1,0 +1,88 @@
+{
+  "name": "rea-desk",
+  "version": "0.7.1",
+  "description": "REA Desk - acesso remoto simples: receba ajuda ou ajude alguém com um código",
+  "author": "REA Desk",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build:ui": "node scripts/build-ui.js",
+    "prestart": "npm run build:ui",
+    "server": "node server/server.js",
+    "test": "node server/test.js && node scripts/test-migrations.js && node scripts/test-watchdog.js && node scripts/test-monitors.js && node scripts/test-history.js && node scripts/test-viewmode.js && node scripts/test-contrast.js",
+    "icon": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-icon.ps1",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "dist:dir": "electron-builder --win dir --x64 --publish never",
+    "release": "node scripts/release.js",
+    "update:build-local": "node scripts/build-local.js",
+    "update:serve-local": "node scripts/serve-update.js",
+    "predist": "npm run build:ui",
+    "predist:dir": "npm run build:ui"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "koffi": "^3.3.7",
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@tailwindcss/cli": "^4.3.4",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "lucide": "^1.69.0",
+    "motion": "^14.9.1",
+    "semver": "^7.8.6",
+    "tailwindcss": "^4.3.4"
+  },
+  "build": {
+    "appId": "br.com.readesk.app",
+    "productName": "REA Desk",
+    "artifactName": "REA-Desk-Instalar-${version}.${ext}",
+    "publish": {
+      "provider": "github",
+      "owner": "PedrooLucca",
+      "repo": "rea-desk",
+      "releaseType": "release"
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "server/server.js",
+      "config/defaults.json",
+      "build/icon.png",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "REA Desk",
+      "deleteAppDataOnUninstall": false,
+      "differentialPackage": true,
+      "language": "1046"
+    }
+  }
+}

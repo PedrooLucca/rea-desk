@@ -1,0 +1,4 @@
+/* Base: reset mínimo que vale para todas as telas e janelas. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--background); color: var(--foreground); }
+[hidden] { display: none !important; }

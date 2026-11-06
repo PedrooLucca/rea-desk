@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src ws: wss:; media-src 'self' blob: mediastream:; img-src 'self' data:; style-src 'self'; script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REA Desk</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<header>
+  <div class="brand">REA Desk</div>
+  <div id="conn" class="pill off">Conectando…</div>
+  <button id="btnTheme" class="icon-btn" type="button" title="Tema" aria-label="Tema"><i data-lucide="moon"></i></button>
+  <button id="btnSettings" class="ghost"><i data-lucide="settings"></i>Configurações</button>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<div id="rollbackBar" class="updatebar warn" hidden>
+  <span id="rollbackText"></span>
+  <span class="spacer"></span>
+  <button id="btnRollbackOk" class="ghost">Entendi</button>
+</div>
+<div id="updateBar" class="updatebar" hidden>
+  <span id="updateText"></span>
+  <progress id="updateProgress" max="100" value="0" hidden></progress>
+  <span class="spacer"></span>
+  <button id="btnUpdateNow">Atualizar agora</button>
+  <button id="btnUpdateLater" class="ghost">Depois</button>
+</div>
+
+<main id="home">
+  <div class="home-grid">
+    <section class="card">
+      <div class="card-head">
+        <span class="card-icon"><i data-lucide="shield-check"></i></span>
+        <div><h2>Quero receber ajuda</h2><p>Diga este código para quem vai ajudar você.</p></div>
+      </div>
+      <div class="idbox">
+        <div class="big" id="myId">---</div>
+        <button id="copyId" class="ghost" type="button">
+          <i data-lucide="copy" class="ico-idle"></i><i data-lucide="check" class="ico-done"></i>
+          <span class="lbl-idle">Copiar código</span><span class="lbl-done">Copiado</span>
+        </button>
+      </div>
+      <p class="hint">Você decide se aceita cada pedido. Só aceite se conhece a pessoa e pediu ajuda a ela.</p>
+    </section>
+    <section class="card">
+      <div class="card-head">
+        <span class="card-icon"><i data-lucide="monitor"></i></span>
+        <div><h2>Quero ajudar alguém</h2><p>Digite o código que a outra pessoa informou.</p></div>
+      </div>
+      <div class="connect">
+        <input id="remoteId" class="code-input" inputmode="numeric" maxlength="11" placeholder="000 000 000" autocomplete="off" aria-label="Código da outra pessoa">
+        <button id="btnConnect" type="button">Conectar<i data-lucide="arrow-right"></i></button>
+      </div>
+      <div id="homeMsg" class="msg" aria-live="polite"></div>
+      <p class="hint">O outro computador precisa estar com o REA Desk aberto.</p>
+    </section>
+  </div>
+  <section class="card hist">
+    <div class="hist-head"><h2>Computadores recentes</h2><button id="histClear" class="linkbtn" type="button" hidden>Limpar</button></div>
+    <ul id="histList" class="hist-list"></ul>
+    <div id="histEmpty" class="empty">
+      <i data-lucide="clock"></i>
+      <p>Os computadores que você acessar aparecem aqui, para conectar com um clique.</p>
+    </div>
+  </section>
+  <p id="netNote" class="note" hidden><i data-lucide="wifi"></i>Os dois computadores precisam estar na mesma rede (mesmo Wi-Fi ou cabo).</p>
+</main>
+
+<main id="session" hidden>
+  <div class="stage">
+    <div class="view" id="viewWrap">
+      <video id="remote" autoplay playsinline muted tabindex="0"></video>
+
+      <div id="hostNote" class="overlay" hidden>
+        <div class="state-card host-card">
+          <i data-lucide="monitor"></i>
+          <h3>Seu computador está sendo acessado</h3>
+          <p class="lead">Por <b id="hostPeer"></b>.</p>
+          <p class="sub">Você pode fechar esta janela: o acesso continua. Para parar a qualquer momento, clique no botão abaixo.</p>
+          <p id="monNote" class="sub" hidden>Quem está acessando está vendo o(s) <b>monitor(es) <span id="monNum"></span></b> deste computador.</p>
+          <p id="cursorNote" class="sub" hidden>O ponteiro do mouse deste computador foi escondido a pedido de quem está acessando.
+            <button id="btnCursorShow" class="ghost" type="button">Mostrar meu mouse</button></p>
+          <button id="btnEndHost" class="danger big-btn" type="button">Encerrar acesso agora</button>
+        </div>
+      </div>
+
+      <div id="waiting" class="overlay" role="status" hidden>
+        <div class="state-card"><span class="spinner" aria-hidden="true"></span><h3>Conectando…</h3><p>Aguarde alguns segundos.</p></div>
+      </div>
+      <div id="linkLost" class="overlay" role="status" hidden>
+        <div class="state-card warn"><i data-lucide="wifi-off"></i><h3>Reconectando…</h3><p>A conexão ficou instável. Se não voltar em alguns segundos, o acesso será encerrado.</p></div>
+      </div>
+      <div id="connFlash" class="flash" role="status" hidden><i data-lucide="check"></i>Conectado a <b id="connFlashName"></b></div>
+
+      <!-- Barra flutuante: fica sobre a imagem e pode ser recolhida -->
+      <div id="dock" class="dock" role="toolbar" aria-label="Controles do acesso remoto">
+        <span id="linkQ" class="quality" data-level="none" title="Qualidade da conexão" hidden>
+          <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="linkMs">—</span>
+        </span>
+        <div class="dock-body">
+          <span id="sessInfo" class="dock-info"></span>
+          <label id="ctlWrap" class="tbtn" title="Usar mouse e teclado no outro computador (Ctrl+Alt+Shift+M)">
+            <input type="checkbox" id="ctlToggle" checked><i data-lucide="mouse-pointer-click"></i><span>Controlar</span>
+          </label>
+          <label id="curWrap" class="tbtn" title="Mostrar o mouse do outro computador. Desmarque para escondê-lo; ele também deixa de aparecer para quem está lá.">
+            <input type="checkbox" id="curToggle" checked><i data-lucide="mouse-pointer-2"></i><span class="lbl">Mostrar o mouse do outro computador</span>
+          </label>
+          <span id="monPick" class="monpick" hidden></span>
+          <button id="btnPopout" class="dock-btn" type="button" hidden title="Abre outra janela mostrando outro monitor do computador que você está acessando"><i data-lucide="external-link"></i><span class="lbl">Outro monitor em nova janela</span></button>
+          <button id="btnRefresh" class="dock-btn" type="button" title="Atualizar imagem: use se a imagem do outro computador parar de se mexer"><i data-lucide="refresh-cw"></i><span class="lbl">Atualizar imagem</span></button>
+          <button id="btnFile" class="dock-btn" type="button" title="Enviar arquivo"><i data-lucide="paperclip"></i><span class="lbl">Enviar arquivo</span></button>
+          <button id="btnView" class="dock-btn" type="button" aria-pressed="true"><i data-lucide="minimize-2" class="ic-shrink"></i><i data-lucide="maximize-2" class="ic-stretch"></i><span class="lbl">Exibição: reduzida</span></button>
+          <button id="btnChat" class="dock-btn" type="button" aria-pressed="true" title="Esconde ou mostra a conversa (Ctrl+Alt+Shift+C)"><i data-lucide="message-square"></i><span id="chatBtnText" class="lbl">Ocultar conversa</span><span id="chatBadge" class="badge" hidden></span></button>
+          <button id="btnKeys" class="dock-btn" type="button" aria-expanded="false" title="Atalhos do teclado (Ctrl+Alt+Shift+K)"><i data-lucide="keyboard"></i><span class="lbl">Atalhos</span></button>
+          <input id="fileInput" type="file" hidden>
+        </div>
+        <button id="btnEnd" class="danger dock-end" type="button" title="Encerrar acesso"><i data-lucide="power"></i><span>Encerrar</span></button>
+        <button id="btnDock" class="dock-toggle" type="button" aria-expanded="true" title="Recolher a barra (Ctrl+Alt+Shift+B)"><i data-lucide="chevron-up"></i><span class="lbl">Recolher barra</span></button>
+      </div>
+
+      <div id="keysPop" class="popover" role="dialog" aria-label="Atalhos do teclado" hidden>
+        <h3>Atalhos</h3>
+        <ul class="keys">
+          <li><span>Mostrar ou ocultar a conversa</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>C</kbd></li>
+          <li><span>Exibição reduzida ou esticada</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>V</kbd></li>
+          <li><span>Usar ou soltar mouse e teclado</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>M</kbd></li>
+          <li><span>Recolher ou abrir a barra</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>B</kbd></li>
+        </ul>
+        <p class="hint">Com <b>Controlar</b> ligado, tudo o que você digita vai para o outro computador. Estes atalhos são os únicos que ficam com este programa.</p>
+        <p id="linkDetail" class="detail">Medindo a conexão…</p>
+      </div>
+    </div>
+    <aside class="chat">
+      <div class="chat-title">Conversa</div>
+      <div id="log" class="log"></div>
+      <form id="chatForm" class="chat-form"><input id="chatText" placeholder="Digite uma mensagem" autocomplete="off" aria-label="Mensagem"><button type="submit">Enviar</button></form>
+    </aside>
+  </div>
+</main>
+
+<div id="incoming" class="modal" role="alertdialog" aria-modal="true" aria-labelledby="inTitle" hidden>
+  <div class="dialog">
+    <div class="dialog-head">
+      <span class="card-icon warn"><i data-lucide="shield-alert"></i></span>
+      <div><h3 id="inTitle">Alguém quer acessar seu computador</h3><p class="who"><b id="inFrom"></b></p></div>
+    </div>
+    <div class="dialog-body">
+      <div class="callout warn"><i data-lucide="triangle-alert"></i><p>Só permita se você conhece essa pessoa e pediu ajuda a ela. Desconfie de ligações ou mensagens pedindo para você instalar ou aceitar isto.</p></div>
+      <div class="setgroup">
+        <label class="chk"><input type="checkbox" id="permCtl" checked><span><b>Mouse e teclado</b><small>Deixar a pessoa usar meu mouse e teclado.</small></span></label>
+        <label class="chk"><input type="checkbox" id="permFiles" checked><span><b>Arquivos e textos</b><small>Deixar a pessoa enviar arquivos e compartilhar a área de transferência (o que cada um copiar pode ser colado no outro).</small></span></label>
+      </div>
+    </div>
+    <div class="dialog-foot"><button id="inDeny" class="ghost" type="button" data-autofocus>Não permitir</button><button id="inAccept" type="button">Permitir</button></div>
+  </div>
+</div>
+
+<div id="welcome" class="modal" role="dialog" aria-modal="true" aria-labelledby="welTitle" hidden>
+  <div class="dialog">
+    <div class="dialog-head">
+      <span class="card-icon"><i data-lucide="monitor"></i></span>
+      <div><h3 id="welTitle">Bem-vindo ao REA Desk</h3><p>Receba ajuda de alguém no seu computador ou ajude alguém no computador dela.</p></div>
+    </div>
+    <div class="dialog-body">
+      <label class="field">Que nome devemos mostrar para quem se conectar a este computador?
+        <input id="welName" maxlength="40" autocomplete="off" data-autofocus>
+      </label>
+      <p class="hint">Se o Windows perguntar sobre permitir acesso à rede, clique em <b>Permitir acesso</b>.</p>
+    </div>
+    <div class="dialog-foot"><button id="welOk" type="button">Começar</button></div>
+  </div>
+</div>
+
+<div id="settings" class="modal" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden>
+  <div class="dialog wide">
+    <div class="dialog-head">
+      <span class="card-icon"><i data-lucide="settings"></i></span>
+      <div><h3 id="setTitle">Configurações</h3></div>
+    </div>
+    <div class="dialog-body">
+      <label class="field">Nome deste computador
+        <input id="cfgName" maxlength="40" autocomplete="off" data-autofocus>
+        <small>Aparece no pedido de acesso para quem se conectar.</small>
+      </label>
+
+      <div class="setgroup">
+        <h4>Geral</h4>
+        <label class="chk"><input type="checkbox" id="cfgAuto"><span><b>Abrir junto com o Windows</b><small>Assim você fica pronto para receber ajuda.</small></span></label>
+        <label class="chk"><input type="checkbox" id="cfgAutoFit" checked><span><b>Ajustar a janela ao conectar</b><small>Usa o tamanho da tela do outro computador.</small></span></label>
+      </div>
+
+      <div class="setgroup updbox">
+        <h4>Atualizações</h4>
+        <div class="upd-row"><span id="verText">REA Desk</span>
+          <button id="btnCheckUpdate" class="ghost" type="button"><i data-lucide="refresh-cw"></i>Procurar atualizações</button></div>
+        <div id="updMsg" class="hint" aria-live="polite"></div>
+        <label class="chk"><input type="checkbox" id="cfgSilent" checked><span><b>Instalar correções pequenas sozinho</b><small>Sem perguntar, quando ninguém está acessando.</small></span></label>
+      </div>
+
+      <details class="advanced">
+        <summary>Avançado <small>normalmente não precisa mexer</small></summary>
+        <label class="field">Endereço do servidor (deixe em branco para automático)<input id="cfgServer" placeholder="automático"></label>
+        <label class="field">Servidor de apoio para conexões pela internet<input id="cfgStun" placeholder="automático"></label>
+      </details>
+      <p class="hint" id="ver"></p>
+    </div>
+    <div class="dialog-foot"><button id="cfgCancel" class="ghost" type="button">Cancelar</button><button id="cfgSave" type="button">Salvar</button></div>
+  </div>
+</div>
+
+<div id="confirm" class="modal" role="alertdialog" aria-modal="true" aria-labelledby="cfTitle" hidden>
+  <div class="dialog">
+    <div class="dialog-head">
+      <span class="card-icon warn"><i data-lucide="trash-2"></i></span>
+      <div><h3 id="cfTitle"></h3><p id="cfText"></p></div>
+    </div>
+    <div class="dialog-foot"><button id="cfNo" class="ghost" type="button" data-autofocus>Cancelar</button><button id="cfYes" class="danger" type="button"></button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="assets/ui.js"></script>
+<script src="migrations.js"></script>
+<script src="history.js"></script>
+<script src="viewmode.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>
