@@ -1,6 +1,6 @@
 {
   "name": "rea-desk",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "REA Desk - acesso remoto simples: receba ajuda ou ajude alguém com um código",
   "author": "REA Desk",
   "main": "src/main.js",
