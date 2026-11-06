@@ -2,6 +2,17 @@
 
 Mais recente primeiro. Os instaladores e as notas de cada versão ficam em [Releases](https://github.com/PedrooLucca/rea-desk/releases).
 
+## 0.8.0
+
+- **Entrar sem pedir permissão toda vez:** ao permitir um acesso, marque **Lembrar este computador** (vem desmarcado). Nas próximas vezes esse computador entra sozinho, com as
+  mesmas permissões, sem você precisar clicar em **Permitir**. A janela sobe e avisa que o acesso foi automático. Vale só para o computador lembrado (não basta saber o código):
+  os dois guardam um segredo e a cada pedido o seu computador confere uma prova. Se a conferência falhar, o pedido aparece normalmente, com um aviso. Para remover, vá em
+  **Configurações → Computadores de confiança**.
+- **Teclas do Windows no computador controlado:** com o foco na imagem do outro computador, a tecla **Windows** (e Win+letra), **Alt+Tab**, **Alt+Esc**, **Alt+Espaço**, **Alt+F4**,
+  **Ctrl+Esc** e **Ctrl+Shift+Esc** agem no computador controlado e não no seu. Fora da imagem, o Windows local continua com elas.
+- **Atenção:** nesta versão o gancho de teclado do Windows pode fazer algum antivírus desconfiar; ele só fica ligado enquanto o foco está na imagem do outro computador e não guarda o que é digitado.
+- Os testes automáticos passam a conferir também as regras das teclas do Windows e os computadores de confiança.
+
 ## 0.7.1
 
 - Saem da barra de controles os botões **Ajustar janela** e **Tela cheia** (e o atalho `Ctrl+Alt+Shift+F`), e também o botão **Tela cheia** da janela do

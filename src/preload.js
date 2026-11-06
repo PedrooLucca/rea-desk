@@ -3,10 +3,15 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Canal direto com o processo que injeta mouse/teclado (não passa pelo processo principal).
 let inputPort = null;
-ipcRenderer.on('input-port', (e) => { inputPort = e.ports[0]; });
+const sysKeyHandlers = [];
+ipcRenderer.on('input-port', (e) => {
+  inputPort = e.ports[0];
+  inputPort.onmessage = (ev) => { for (const h of sysKeyHandlers) { try { h(ev.data); } catch {} } };   // teclas do Windows capturadas pelo gancho
+});
 
 contextBridge.exposeInMainWorld('rea', {
   input: (ev) => (inputPort ? inputPort.postMessage(ev) : ipcRenderer.send('input', ev)),
+  onSysKey: (cb) => sysKeyHandlers.push(cb),
   releaseInput: () => (inputPort ? inputPort.postMessage({ k: 'release' }) : ipcRenderer.send('input-release')),
   readClipboard: () => ipcRenderer.invoke('clip-read'),
   writeClipboard: (t) => ipcRenderer.invoke('clip-write', t),

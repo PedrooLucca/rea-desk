@@ -73,6 +73,34 @@ mudou, envia `{k:'clip', text, auto:true}`. Quem recebe grava na sua (`clip-writ
 um contador (`clipEpoch`) descarta leituras que ficaram velhas durante a gravação. A primeira leitura da sessão só marca o que já estava copiado.
 O host só participa com `perms.files` e avisa o controlador por `clipsync`; nenhum canal IPC novo.
 
+## Computadores de confiança
+
+Código em `renderer.js` (bloco "Computadores de confiança") e lógica pura em `src/renderer/trust.js` (testada em `scripts/test-trust.js`). O servidor de conexão
+**não mudou**: as provas vão em mensagens `sig`, que ele já encaminha entre quem tem uma chamada ligada.
+
+1. **Combinar (uma vez):** o computador controlado aceita com **Lembrar** marcado, gera um segredo de 256 bits e o envia pelo canal de dados (`{k:'trust', secret}`,
+   criptografado e direto entre os dois). O controlador o guarda e responde `{k:'trustok'}`; só então o computador controlado guarda o controlador como
+   confiável. Chaves do `localStorage`: `trustedControllers` (quem pode entrar sem perguntar: segredo, nome, permissões, último uso) e `trustedHosts` (segredo de
+   cada computador que lembrou este).
+2. **Pedido seguinte:** `incoming` de um código confiável não abre a janela de pedido. O computador controlado manda `sig {trust:'challenge', nonce}` (nonce novo, 128 bits);
+   o controlador responde `sig {trust:'proof', mac}` com `HMAC-SHA-256(segredo, "call|nonce|códigoControlado|códigoControlador")`. Prova certa: aceita sozinho
+   (`acceptAutomatically`). Prova errada, ausente (5 s) ou de quem não tem segredo: o pedido aparece com aviso.
+3. **Prova do canal:** num acesso automático as permissões começam zeradas. Quando o canal de dados abre, o computador controlado manda `{k:'auth', nonce}` e o
+   controlador responde `{k:'authok', mac}` com `HMAC(segredo, "chan|nonce|impressãoDigitalDTLSControlado|impressãoDigitalDTLSControlador|códigos")`
+   (impressões digitais lidas do SDP). Só com a prova certa as permissões combinadas são liberadas (`grantPerms`); sem ela, em 8 s, o acesso é encerrado. Isso amarra a
+   prova à conexão real e impede que um servidor de conexão adulterado repita a prova do pedido numa sessão que ele controla.
+4. O segredo nunca passa pelo servidor de conexão depois de combinado, e a comparação das provas é em tempo constante.
+
+## Teclas do Windows (gancho de teclado)
+
+O Windows trata Win, Alt+Tab, Ctrl+Esc etc. antes de o programa vê-las. O processo de entrada de **quem controla** (`src/injector.js`) instala um gancho
+`WH_KEYBOARD_LL` (`src/keyhook.js`, via `koffi`) **só enquanto** o renderer pede (`{k:'syskeys', on}`): papel de controlador, **Controlar** ligado e foco do
+teclado na imagem (`wantSysKeys` em `renderer.js`, que renova o pedido a cada ~1 s; sem renovação o gancho cai sozinho em 3 s). A decisão tecla a tecla é
+pura e testada (`src/syskeys.js`): engole Win (e qualquer tecla com Win apertada), Alt+Tab/Esc/Espaço/F4, Ctrl+Esc e Ctrl+Shift+Esc, e devolve
+`{k:'syskey', code, down}` pela mesma porta da janela, que as envia como as demais teclas (`{k:'key'}`). Só age se a janela em primeiro plano for do
+processo principal (`{k:'owner', pid}`) e ignora as teclas que o próprio programa injeta (marca em `dwExtraInfo`, `INJECT_MARK` em `input.js`). O mapa
+de teclas ficou em `src/keys.js` (nos dois sentidos). Nenhum canal IPC novo no processo principal; no canal de dados nada mudou.
+
 ## Vários monitores
 
 - O processo principal lê os monitores, converte para **pixels físicos** da área de trabalho virtual (`screen.dipToScreenRect`) e guarda qual

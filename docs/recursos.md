@@ -12,6 +12,20 @@ controle de mouse e teclado e a transferência de arquivos e textos. Toda conex�
 Na bandeja do sistema, fechar a janela não encerra o programa (ele continua pronto para receber pedidos); o menu do ícone tem
 "Encerrar acesso remoto agora". Só abre uma janela por vez, e há a opção de abrir junto com o Windows.
 
+## Computadores de confiança (entrar sem pedir permissão)
+
+Ao **Permitir** um pedido, quem é acessado pode marcar **Lembrar este computador** (desmarcado por padrão). Nas próximas vezes, esse computador entra
+**sem que você precise clicar em Permitir**, com as mesmas escolhas de mouse/teclado e arquivos/textos de quando foi lembrado. A janela sobe e pisca, e a
+tela de acesso diz "permitido automaticamente", então um acesso automático nunca é silencioso.
+
+- **Só vale para o computador que foi lembrado.** O código de 9 dígitos sozinho não basta: na primeira vez os dois lados combinam um segredo, e a cada pedido
+  o computador controlado confere uma prova que só quem tem o segredo consegue dar. Quem apenas souber ou copiar o código **não** entra sem perguntar.
+- **Se a prova falhar** (ou o outro computador perdeu o segredo, ou é outra pessoa usando o mesmo código), o pedido aparece normalmente, com um aviso em
+  vermelho de que a identidade não foi confirmada.
+- **Remover:** em **Configurações → Computadores de confiança** há a lista (nome, código, o que foi permitido e quando foi usado pela última vez), com um
+  botão de lixeira em cada item e **Remover todos**. Depois de remover, o próximo pedido volta a perguntar.
+- Quem controla não precisa fazer nada: o segredo é guardado sozinho depois de a pessoa aceitar e marcar **Lembrar**.
+
 ## Barra de controles, atalhos e tema
 
 Durante o acesso, os controles ficam numa **barra flutuante** sobre a imagem. Os botões têm só ícone; o nome
@@ -36,6 +50,11 @@ resolução e taxa de dados.
 **Atalhos** (`Ctrl+Alt+Shift` + letra; não são enviados ao outro computador): `C` conversa, `V` exibição, `M` usar ou soltar
 mouse e teclado, `B` recolher a barra, `K` lista de atalhos. Com **Controlar** ligado, todas as outras teclas vão
 para o outro computador.
+
+**Teclas do Windows no outro computador:** com o foco do teclado na imagem do outro computador e **Controlar** ligado, a tecla **Windows**
+(sozinha ou combinada: Win+D, Win+E, Win+R, Win+Shift+S…), **Alt+Tab**, **Alt+Esc**, **Alt+Espaço**, **Alt+F4**, **Ctrl+Esc** e **Ctrl+Shift+Esc**
+vão para o outro computador e **não** agem no seu. Se o foco sair da imagem (você clicou na barra ou na conversa), o Windows local volta a
+ficar com essas teclas, e para sair da imagem basta clicar fora dela. Alt+F4 fecha a janela do outro computador, não esta.
 
 **Tema:** o botão de lua, sol ou monitor no cabeçalho alterna entre **escuro** (padrão), **claro** e **do sistema**; a escolha vale na próxima
 abertura. Quem pediu "reduzir movimento" no Windows não vê animações (o anel de "conectando" continua girando, mais devagar).

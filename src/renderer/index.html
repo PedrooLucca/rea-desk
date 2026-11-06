@@ -81,6 +81,7 @@
           <h3>Seu computador está sendo acessado</h3>
           <p class="lead">Por <b id="hostPeer"></b>.</p>
           <p class="sub">Você pode fechar esta janela: o acesso continua. Para parar a qualquer momento, clique no botão abaixo.</p>
+          <p id="autoNote" class="sub" hidden>Este acesso foi permitido automaticamente porque este computador é de confiança. Para mudar isso, remova-o em Configurações.</p>
           <p id="monNote" class="sub" hidden>Quem está acessando está vendo o(s) <b>monitor(es) <span id="monNum"></span></b> deste computador.</p>
           <p id="cursorNote" class="sub" hidden>O ponteiro do mouse deste computador foi escondido a pedido de quem está acessando.
             <button id="btnCursorShow" class="ghost" type="button">Mostrar meu mouse</button></p>
@@ -130,7 +131,7 @@
           <li><span>Usar ou soltar mouse e teclado</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>M</kbd></li>
           <li><span>Recolher ou abrir a barra</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>B</kbd></li>
         </ul>
-        <p class="hint">Com <b>Controlar</b> ligado, tudo o que você digita vai para o outro computador. Estes atalhos são os únicos que ficam com este programa.</p>
+        <p class="hint">Com <b>Controlar</b> ligado, tudo o que você digita vai para o outro computador, inclusive a tecla <b>Windows</b>, <b>Alt+Tab</b> e <b>Ctrl+Esc</b> (com o foco na imagem). Estes atalhos são os únicos que ficam com este programa.</p>
         <p id="linkDetail" class="detail">Medindo a conexão…</p>
       </div>
     </div>
@@ -149,10 +150,12 @@
       <div><h3 id="inTitle">Alguém quer acessar seu computador</h3><p class="who"><b id="inFrom"></b></p></div>
     </div>
     <div class="dialog-body">
+      <div id="inTrustWarn" class="callout danger" hidden><i data-lucide="shield-alert"></i><p><b>Atenção:</b> este computador já tinha permissão para entrar sem perguntar, mas não foi possível confirmar quem ele é. Pode ser outra pessoa usando o mesmo código.</p></div>
       <div class="callout warn"><i data-lucide="triangle-alert"></i><p>Só permita se você conhece essa pessoa e pediu ajuda a ela. Desconfie de ligações ou mensagens pedindo para você instalar ou aceitar isto.</p></div>
       <div class="setgroup">
         <label class="chk"><input type="checkbox" id="permCtl" checked><span><b>Mouse e teclado</b><small>Deixar a pessoa usar meu mouse e teclado.</small></span></label>
         <label class="chk"><input type="checkbox" id="permFiles" checked><span><b>Arquivos e textos</b><small>Deixar a pessoa enviar arquivos e compartilhar a área de transferência (o que cada um copiar pode ser colado no outro).</small></span></label>
+        <label class="chk" id="rememberRow"><input type="checkbox" id="permRemember"><span><b>Lembrar este computador</b><small>Nas próximas vezes ele entra sem pedir a sua permissão, com estas mesmas escolhas. Você pode remover depois em Configurações.</small></span></label>
       </div>
     </div>
     <div class="dialog-foot"><button id="inDeny" class="ghost" type="button" data-autofocus>Não permitir</button><button id="inAccept" type="button">Permitir</button></div>
@@ -201,6 +204,14 @@
         <label class="chk"><input type="checkbox" id="cfgSilent" checked><span><b>Instalar correções pequenas sozinho</b><small>Sem perguntar, quando ninguém está acessando.</small></span></label>
       </div>
 
+      <div class="setgroup">
+        <h4>Computadores de confiança</h4>
+        <p class="hint">Computadores que entram aqui sem pedir a sua permissão.</p>
+        <ul id="trustList" class="trust-list"></ul>
+        <p id="trustEmpty" class="hint">Nenhum. Para adicionar, marque <b>Lembrar este computador</b> ao permitir um acesso.</p>
+        <button id="trustClear" class="linkbtn" type="button" hidden>Remover todos</button>
+      </div>
+
       <details class="advanced">
         <summary>Avançado <small>normalmente não precisa mexer</small></summary>
         <label class="field">Endereço do servidor (deixe em branco para automático)<input id="cfgServer" placeholder="automático"></label>
@@ -226,6 +237,7 @@
 <script src="assets/ui.js"></script>
 <script src="migrations.js"></script>
 <script src="history.js"></script>
+<script src="trust.js"></script>
 <script src="viewmode.js"></script>
 <script src="renderer.js"></script>
 </body>

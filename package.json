@@ -10,7 +10,7 @@
     "build:ui": "node scripts/build-ui.js",
     "prestart": "npm run build:ui",
     "server": "node server/server.js",
-    "test": "node server/test.js && node scripts/test-migrations.js && node scripts/test-watchdog.js && node scripts/test-monitors.js && node scripts/test-history.js && node scripts/test-viewmode.js && node scripts/test-contrast.js",
+    "test": "node server/test.js && node scripts/test-migrations.js && node scripts/test-watchdog.js && node scripts/test-monitors.js && node scripts/test-history.js && node scripts/test-viewmode.js && node scripts/test-contrast.js && node scripts/test-syskeys.js && node scripts/test-keyhook.js && node scripts/test-trust.js && node scripts/test-release-notes.js",
     "icon": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-icon.ps1",
     "dist": "electron-builder --win nsis --x64 --publish never",
     "dist:dir": "electron-builder --win dir --x64 --publish never",

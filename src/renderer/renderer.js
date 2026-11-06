@@ -131,10 +131,8 @@ function onSignal(m) {
     case 'incoming':
       if (peerId || incoming) return send({ t: 'answer', to: m.from, accept: false, name: myName });
       incoming = { from: m.from, name: m.name || '' };
-      $('#inFrom').textContent = `${incoming.name || 'Alguém'} (código ${fmtId(m.from)})`;
-      $('#permCtl').checked = true; $('#permFiles').checked = true;
-      $('#incoming').hidden = false;
-      window.rea.attention();
+      if (TR.available() && trustedCtrls[m.from]) askTrust(incoming);        // computador de confiança: pede a prova antes de decidir
+      else showIncoming(incoming, false);
       break;
     case 'answered':
       if (m.from !== peerId || role !== 'controller') return;
@@ -156,11 +154,12 @@ function onSignal(m) {
       }, 25000);
       break;
     case 'sig':
+      if (m.data && m.data.trust) { onTrustSig(m).catch(() => {}); break; }   // prova de computador de confiança (não é WebRTC)
       if (m.from === peerId) onRtc(m.data); break;
     case 'bye':
       if (m.from === peerId || (incoming && incoming.from === m.from)) {
         toast(`${incoming ? 'O pedido foi cancelado.' : 'O acesso foi encerrado pela outra pessoa.'}`);
-        if (incoming && incoming.from === m.from) { incoming = null; $('#incoming').hidden = true; }
+        if (incoming && incoming.from === m.from) { incoming = null; $('#incoming').hidden = true; clearTrustChallenge(); }
         endSession(false);
       }
       break;
@@ -236,7 +235,7 @@ async function onRtc(d) {
 function setupDC() {
   dc.binaryType = 'arraybuffer';
   dc.bufferedAmountLowThreshold = 1 << 20;
-  dc.onopen = () => { log('Conexão segura estabelecida.', 'sys'); if (role === 'host') { hostSendMonitors(); dsend({ k: 'clipsync', ok: !!perms.files }); } };
+  dc.onopen = () => { log('Conexão segura estabelecida.', 'sys'); if (role === 'host') { hostSendMonitors(); dsend({ k: 'clipsync', ok: !!perms.files }); onChannelOpenTrust(); } };
   dc.onmessage = (e) => {
     if (typeof e.data !== 'string') return onFileChunk(e.data);
     let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -275,6 +274,7 @@ async function onDC(m) {
         if (chatUnread === 1) toast(`Nova mensagem de ${who()}. Clique em "Mostrar conversa" para ler.`, 5000);
       }
       break;
+    case 'trust': case 'trustok': case 'auth': case 'authok': onTrustDC(m).catch(() => {}); break;
     case 'clipsync':                                      // o computador controlado diz se a área de transferência é compartilhada
       if (role === 'controller') clipPeerAllowed = m.ok !== false;
       break;
@@ -384,11 +384,13 @@ function reset() {
   $('#monPick').hidden = true; $('#monPick').textContent = ''; $('#monNote').hidden = true;
   perms = { control: false, files: false };
   clipLast = null; clipEpoch++; clipPeerAllowed = true;
+  clearTrustSession();
   pendingIce = []; hasRemote = false;
   $('#session').hidden = true; $('#home').hidden = false; $('#log').textContent = '';
   chatUnread = 0; applyChat();
   $('#btnConnect').disabled = false; setHistBusy(false);
   window.rea.sessionState(false);
+  syncSysKeys();                                              // sessão acabou: o Windows local volta a ficar com as teclas dele
 }
 
 /* ---------- Entrada do controlador (mouse/teclado) ---------- */
@@ -704,6 +706,7 @@ function openViewWindow() {
   updateViewButtons();
   attachInput(v, () => view2 && view2.monitor);
   w.addEventListener('blur', releaseRemote);
+  for (const ev of ['focus', 'blur']) { w.addEventListener(ev, syncSysKeys); v.addEventListener(ev, syncSysKeys); }
   v.addEventListener('pause', () => { if (view2 && view2.video === v && v.srcObject) v.play().catch(() => {}); });
   w.addEventListener('pagehide', () => {                                           // o usuário fechou a janela
     if (!view2 || view2.win !== w) return;
@@ -884,6 +887,30 @@ async function clipApply(text) {                              // texto automáti
   try { await clipIO.write(text); } catch {}
 }
 
+/* ---------- Teclas do Windows no computador controlado (Win, Alt+Tab, Ctrl+Esc...) ---------- */
+// O Windows trata essas teclas antes do programa vê-las. Enquanto o foco do teclado está na IMAGEM do outro computador (e
+// "Controlar" está ligado), o processo de entrada captura essas teclas (gancho de teclado, src/keyhook.js) e elas vêm aqui para
+// seguirem ao outro computador pelo mesmo canal das demais teclas. Fora disso (foco na barra, na conversa, outra janela) o Windows
+// local continua com elas. A captura é renovada a cada ~1 s; sem renovação ela desliga sozinha.
+let sysKeysOn = false, sysKeysBeat = 0;
+const hasVideoFocus = (win, v) => { try { return !!v && !win.closed && win.document.hasFocus() && win.document.activeElement === v; } catch { return false; } };
+function wantSysKeys() {
+  if (role !== 'controller' || !$('#ctlToggle').checked || !dc || dc.readyState !== 'open') return false;
+  return hasVideoFocus(window, video) || (!!view2 && !view2.pending && hasVideoFocus(view2.win, view2.video));
+}
+function syncSysKeys() {
+  const want = wantSysKeys();
+  if (want === sysKeysOn && !(want && Date.now() - sysKeysBeat > 1000)) return;
+  sysKeysOn = want; sysKeysBeat = Date.now();
+  try { window.rea.input({ k: 'syskeys', on: want }); } catch {}
+}
+window.rea.onSysKey((m) => {
+  if (m && m.k === 'syskey' && typeof m.code === 'string' && controlling()) dsend({ k: 'key', down: !!m.down, code: m.code });
+});
+for (const ev of ['focus', 'blur']) { video.addEventListener(ev, syncSysKeys); window.addEventListener(ev, syncSysKeys); }
+$('#ctlToggle').addEventListener('change', syncSysKeys);
+setInterval(syncSysKeys, 500);
+
 /* ---------- Barra flutuante: recolher, atalhos e qualidade da conexão (só aparência; nada aqui mexe na conexão) ---------- */
 let dockCollapsed = store.get('dockCollapsed', '0') === '1';
 function applyDock() {
@@ -1002,6 +1029,149 @@ for (const [id, y] of [['#home', 8], ['#session', 0]]) {
   new MutationObserver(() => { if (!el.hidden) { try { window.REA_UI.enter(el, { y }); } catch {} } }).observe(el, { attributes: true, attributeFilter: ['hidden'] });
 }
 
+/* ---------- Computadores de confiança (entrar sem pedir permissão) ---------- */
+// Quem é acessado pode marcar "Lembrar este computador" ao permitir. Os dois lados guardam um segredo combinado pelo canal de dados
+// (criptografado, nunca pelo servidor de conexão). Nas próximas vezes o computador controlado manda um desafio; se o outro responder com
+// a prova correta (src/renderer/trust.js), o acesso é permitido sem perguntar, com as mesmas permissões de antes, e a janela sobe para
+// avisar. O código de 9 dígitos sozinho NÃO basta. Se a prova falhar, o pedido aparece normalmente, com um aviso. Antes de liberar
+// mouse, teclado e arquivos num acesso automático, uma segunda prova amarrada às impressões digitais DTLS é conferida no canal de dados.
+const TR = window.REA_TRUST;
+let trustedCtrls = TR.parse(store.get('trustedControllers', '{}'));   // computador controlado: quem pode entrar sem perguntar
+let trustedHosts = TR.parse(store.get('trustedHosts', '{}'));          // controlador: segredo de cada computador que o lembrou
+const saveTrustedCtrls = () => store.set('trustedControllers', JSON.stringify(trustedCtrls));
+const saveTrustedHosts = () => store.set('trustedHosts', JSON.stringify(trustedHosts));
+let trustChallenge = null;   // computador controlado: { from, nonce, timer } enquanto espera a prova de um computador de confiança
+let enroll = null;           // computador controlado: segredo combinado NESTA sessão, esperando a confirmação do outro lado
+let chanAuth = null;         // computador controlado: { want, secret, ctrl, nonce, timer } prova do canal pendente (acesso automático)
+let challengeAnsweredFor = null;   // controlador: já respondeu ao desafio deste computador (uma vez por pedido)
+
+function dtlsFingerprints() {
+  return { local: TR.fingerprintOf(pc && pc.localDescription && pc.localDescription.sdp), remote: TR.fingerprintOf(pc && pc.remoteDescription && pc.remoteDescription.sdp) };
+}
+function showIncoming(inc, unverified) {
+  $('#inFrom').textContent = `${inc.name || 'Alguém'} (código ${fmtId(inc.from)})`;
+  $('#permCtl').checked = true; $('#permFiles').checked = true;
+  $('#permRemember').checked = false;
+  $('#rememberRow').hidden = !TR.available();
+  $('#inTrustWarn').hidden = !unverified;
+  $('#incoming').hidden = false;
+  window.rea.attention();
+}
+function clearTrustChallenge() { if (trustChallenge) { clearTimeout(trustChallenge.timer); trustChallenge = null; } }
+function trustFallback(from) {                                  // sem prova válida: o pedido aparece como qualquer outro, com aviso
+  if (!trustChallenge || trustChallenge.from !== from) return;
+  clearTrustChallenge();
+  if (incoming && incoming.from === from) showIncoming(incoming, true);
+}
+function askTrust(inc) {                                        // um computador de confiança está chamando: pede a prova antes de decidir
+  clearTrustChallenge();
+  const nonce = TR.newNonce();
+  trustChallenge = { from: inc.from, nonce, timer: setTimeout(() => trustFallback(inc.from), 5000) };
+  send({ t: 'sig', to: inc.from, data: { trust: 'challenge', nonce } });
+}
+async function onTrustSig(m) {
+  const d = m.data;
+  if (d.trust === 'challenge') {                                // controlador: o computador chamado pede a prova
+    if (role !== 'controller' || m.from !== peerId || pc || challengeAnsweredFor === peerId) return;
+    const e = trustedHosts[peerId];
+    if (!e || typeof d.nonce !== 'string' || !/^[0-9a-f]{32}$/.test(d.nonce)) return;
+    challengeAnsweredFor = peerId;
+    const mac = await TR.callProof(e.secret, d.nonce, peerId, myId);
+    if (peerId === m.from) send({ t: 'sig', to: m.from, data: { trust: 'proof', mac } });
+  } else if (d.trust === 'proof') {                             // computador controlado: confere a prova
+    const ch = trustChallenge, e = ch && trustedCtrls[m.from];
+    if (!ch || ch.from !== m.from || !e || !incoming || incoming.from !== m.from || typeof d.mac !== 'string') return;
+    const expected = await TR.callProof(e.secret, ch.nonce, myId, m.from);
+    if (trustChallenge !== ch) return;                          // mudou enquanto calculava
+    if (TR.equal(expected, d.mac)) { clearTrustChallenge(); acceptAutomatically(incoming, e); }
+    else trustFallback(m.from);
+  }
+}
+function acceptAutomatically(inc, entry) {
+  incoming = null; $('#incoming').hidden = true;
+  perms = { control: false, files: false };                     // só depois da prova do canal
+  chanAuth = { want: { control: !!entry.control, files: !!entry.files }, secret: entry.secret, ctrl: inc.from, nonce: TR.newNonce(), timer: null };
+  peerId = inc.from; peerName = inc.name; role = 'host';
+  trustedCtrls = TR.touch(trustedCtrls, inc.from, inc.name); saveTrustedCtrls();
+  send({ t: 'answer', to: inc.from, accept: true, name: myName });
+  startHost();
+  $('#autoNote').hidden = false;
+  window.rea.attention();                                       // acesso automático nunca é silencioso: a janela sobe e pisca
+}
+function grantPerms(p) {                                        // libera o que foi combinado (depois da prova do canal)
+  perms = { control: !!p.control, files: !!p.files };
+  $('#btnFile').hidden = !perms.files;
+  dsend({ k: 'clipsync', ok: !!perms.files });
+}
+function failAuth() {
+  if (!chanAuth) return;
+  clearTimeout(chanAuth.timer); chanAuth = null;
+  toastErr('Um acesso automático foi recusado: não foi possível confirmar o outro computador.', 9000);
+  endSession(true);
+}
+function clearTrustSession() {                                  // chamado ao encerrar qualquer sessão
+  enroll = null; challengeAnsweredFor = null;
+  if (chanAuth) { clearTimeout(chanAuth.timer); chanAuth = null; }
+  $('#autoNote').hidden = true;
+}
+// mensagens do canal de dados (chamado por onDC)
+async function onTrustDC(m) {
+  if (m.k === 'trust') {                                        // controlador: o computador chamado combinou um segredo
+    if (role !== 'controller' || typeof m.secret !== 'string' || !/^[0-9a-f]{64}$/.test(m.secret)) return;
+    trustedHosts = TR.put(trustedHosts, peerId, { secret: m.secret, name: peerName }); saveTrustedHosts();
+    dsend({ k: 'trustok' });
+    toastOk('Computador lembrado: da próxima vez, o acesso não vai precisar de permissão.', 6000);
+  } else if (m.k === 'trustok') {                               // computador controlado: o outro guardou o segredo
+    if (role !== 'host' || !enroll || enroll.id !== peerId) return;
+    trustedCtrls = TR.put(trustedCtrls, enroll.id, enroll); saveTrustedCtrls(); enroll = null;
+    renderTrusted();
+    toastOk(`${peerName || 'Este computador'} agora é de confiança: das próximas vezes não vai precisar da sua permissão. Você pode remover em Configurações.`, 8000);
+  } else if (m.k === 'auth') {                                  // controlador: prova do canal, amarrada às impressões digitais
+    const e = trustedHosts[peerId], f = dtlsFingerprints();
+    if (role !== 'controller' || !e || typeof m.nonce !== 'string' || !/^[0-9a-f]{32}$/.test(m.nonce) || !f.local || !f.remote) return;
+    dsend({ k: 'authok', mac: await TR.chanProof(e.secret, m.nonce, f.remote, f.local, peerId, myId) });
+  } else if (m.k === 'authok') {                                // computador controlado: confere e libera as permissões
+    if (role !== 'host' || !chanAuth || typeof m.mac !== 'string') return;
+    const ca = chanAuth, f = dtlsFingerprints();
+    if (!f.local || !f.remote) return failAuth();
+    const expected = await TR.chanProof(ca.secret, ca.nonce, f.local, f.remote, myId, ca.ctrl);
+    if (chanAuth !== ca) return;
+    if (!TR.equal(expected, m.mac)) return failAuth();
+    clearTimeout(ca.timer); chanAuth = null; grantPerms(ca.want);
+  }
+}
+function onChannelOpenTrust() {                                 // chamado quando o canal de dados abre (computador controlado)
+  if (enroll && enroll.id === peerId) dsend({ k: 'trust', secret: enroll.secret });
+  if (chanAuth) { dsend({ k: 'auth', nonce: chanAuth.nonce }); chanAuth.timer = setTimeout(failAuth, 8000); }
+}
+
+// Lista em Configurações
+function renderTrusted() {
+  const ul = $('#trustList'); if (!ul) return;
+  ul.textContent = '';
+  const items = TR.list(trustedCtrls);
+  $('#trustEmpty').hidden = items.length > 0; $('#trustClear').hidden = items.length === 0;
+  for (const e of items) {
+    const li = document.createElement('li'); li.dataset.id = e.id;
+    const txt = document.createElement('span'); txt.className = 'trust-text';
+    const n = document.createElement('b'); n.textContent = e.name || 'Computador sem nome';
+    const sub = document.createElement('small');
+    const what = [e.control ? 'mouse e teclado' : 'só ver a tela', e.files ? 'arquivos e textos' : ''].filter(Boolean).join(' + ');
+    sub.textContent = `${HIST.fmtCode(e.id)} · ${what} · ${e.last ? HIST.timeAgo(e.last) : 'nunca usado'}`;
+    txt.append(n, sub);
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'hist-act trust-del'; del.title = `Remover ${e.name || 'este computador'}`; del.setAttribute('aria-label', del.title);
+    const ic = document.createElement('i'); ic.setAttribute('data-lucide', 'trash-2'); del.append(ic);
+    del.onclick = () => { trustedCtrls = TR.remove(trustedCtrls, e.id); saveTrustedCtrls(); renderTrusted(); toast('Removido. O próximo pedido desse computador vai precisar da sua permissão.', 4500); };
+    li.append(txt, del); ul.append(li);
+  }
+  try { window.REA_UI.icons(ul); } catch {}
+}
+$('#trustClear').onclick = async () => {
+  if (!(await askConfirm('Remover todos os computadores de confiança?', 'Todos voltam a precisar da sua permissão a cada pedido.', 'Remover todos'))) return;
+  trustedCtrls = {}; saveTrustedCtrls(); renderTrusted();
+};
+
 /* ---------- Botões ---------- */
 function startCall(id) {
   if (id.length !== 9) return homeMsg('Digite os 9 números do código que a outra pessoa informou.');
@@ -1090,13 +1260,16 @@ $('#copyId').onclick = async () => {
 };
 
 $('#inAccept').onclick = () => {
+  clearTrustChallenge();
   const { from, name } = incoming; incoming = null; $('#incoming').hidden = true;
   perms = { control: $('#permCtl').checked, files: $('#permFiles').checked };
+  enroll = ($('#permRemember').checked && TR.available()) ? { id: from, name, secret: TR.newSecret(), control: perms.control, files: perms.files } : null;
   peerId = from; peerName = name; role = 'host';
   send({ t: 'answer', to: from, accept: true, name: myName });
   startHost();
 };
 $('#inDeny').onclick = () => {
+  clearTrustChallenge();
   send({ t: 'answer', to: incoming.from, accept: false, name: myName });
   incoming = null; $('#incoming').hidden = true;
 };
@@ -1168,6 +1341,7 @@ $('#btnSettings').onclick = async () => {
   $('#cfgServer').value = cfg.server; $('#cfgStun').value = cfg.stun;
   $('#ver').textContent = '';
   window.rea.update.get().then(renderUpdate).catch(() => {});
+  renderTrusted();
   $('#settings').hidden = false;
 };
 $('#cfgCancel').onclick = () => ($('#settings').hidden = true);

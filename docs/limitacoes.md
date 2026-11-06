@@ -30,6 +30,16 @@
   durante o acesso vai para o outro computador, **inclusive senhas**. Quem é acessado pode desligar negando **Arquivos e textos**; quem controla
   deve evitar copiar algo sigiloso durante o acesso. O programa olha a área de transferência a cada ~0,6 s, então uma cópia seguida de colar muito
   rápido pode chegar depois.
+- **Computadores de confiança:** o segredo é combinado na primeira vez, quando quem é acessado aceita (confiança na primeira vez): um intermediário no servidor de
+  conexão **naquele momento** poderia ficar com ele. Os segredos ficam no `localStorage` do programa, sem criptografia extra: quem usa a sua conta do Windows e
+  alcança a pasta de dados do programa poderia copiá-los. Quem controla um computador de confiança entra sem pedir permissão, então **remova** computadores que você
+  não usa mais, vendeu ou perdeu. Num acesso automático a imagem começa a ser enviada antes de a prova do canal terminar (menos de 1 s); mouse, teclado e arquivos só
+  são liberados depois dela.
+- **Teclas do Windows:** só com o foco na imagem. **Ctrl+Alt+Del** e **Win+L** não funcionam (o Windows reserva a tela de segurança; Win+L, em alguns casos, só
+  tranca o computador de quem controla), e janelas de administrador/UAC não recebem teclas (veja acima). Alt+F4 passa a fechar a janela do outro computador e não
+  mais a deste programa enquanto o foco estiver na imagem.
+- **Antivírus:** o gancho de teclado do Windows é o mesmo mecanismo usado por programas espiões; alguns antivírus podem desconfiar. O programa só o liga com o foco na
+  imagem do outro computador, não guarda nem registra o que é digitado e o desliga ao sair da imagem.
 - **Receber arquivo:** a pergunta "Deseja receber?" ainda usa a janela padrão do navegador (trocá-la exigiria mudar o recebimento do arquivo).
 - **Histórico:** guarda o código do outro computador; se ele ganhar um código novo (reinstalação), o item antigo precisa ser removido.
 

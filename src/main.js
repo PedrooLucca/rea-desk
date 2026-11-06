@@ -94,6 +94,7 @@ function startInjector() {
   try {
     injector = utilityProcess.fork(path.join(__dirname, 'injector.js'), [], { serviceName: 'REA Desk entrada' });
     const me = injector;
+    me.postMessage({ k: 'owner', pid: process.pid });          // o gancho de teclado só age se a janela em primeiro plano for nossa
     me.on('exit', () => { restoreCursorSafely(); if (injector === me) { injector = null; if (!quitting) setTimeout(() => { startInjector(); wireInputPort(); }, 500); } });
     pushTopology();
   } catch (err) { console.error('injector:', err.message); injector = null; }
