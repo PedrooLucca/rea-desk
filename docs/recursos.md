@@ -10,7 +10,8 @@ controle de mouse e teclado e a transferência de arquivos e textos. Toda conex�
 **Encerrar acesso**.
 
 Na bandeja do sistema, fechar a janela não encerra o programa (ele continua pronto para receber pedidos); o menu do ícone tem
-"Encerrar acesso remoto agora". Só abre uma janela por vez, e há a opção de abrir junto com o Windows.
+"Encerrar acesso remoto agora". Só abre uma janela por vez, e há a opção de abrir junto com o Windows (**Configurações → Abrir junto com o Windows**; o programa abre escondido na bandeja). Se você desativar o item em
+Gerenciador de Tarefas → Inicializar, a caixa aparece desmarcada e ligá-la de novo reativa.
 
 ## Computadores de confiança (entrar sem pedir permissão)
 

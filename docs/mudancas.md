@@ -2,6 +2,14 @@
 
 Mais recente primeiro. Os instaladores e as notas de cada versão ficam em [Releases](https://github.com/PedrooLucca/rea-desk/releases).
 
+## 0.8.1
+
+- **Abrir junto com o Windows voltou a funcionar:** a caixa em **Configurações** aparecia sempre desmarcada, mesmo com o programa registrado para abrir com o Windows, e ao
+  clicar em **Salvar** (por qualquer motivo) ele era **removido** da inicialização. Agora a caixa mostra o estado real e salvar não desliga mais a opção. Se você a tinha
+  ligado antes, abra **Configurações**, confira se a caixa está marcada (ligue de novo se precisar) e clique em **Salvar**. O programa abre escondido na bandeja.
+- Se você desativou o REA Desk em **Gerenciador de Tarefas → Inicializar**, a caixa aparece desmarcada; ligá-la de novo reativa o item.
+- Os testes automáticos passam a conferir essa leitura e gravação.
+
 ## 0.8.0
 
 - **Entrar sem pedir permissão toda vez:** ao permitir um acesso, marque **Lembrar este computador** (vem desmarcado). Nas próximas vezes esse computador entra sozinho, com as

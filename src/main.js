@@ -10,6 +10,7 @@ const input = require('./input');
 const net = require('./net');
 const updater = require('./updater');
 const monitors = require('./monitors');
+const autostart = require('./autostart');
 const defaults = require('../config/defaults.json');
 
 // Janela minimizada/coberta não pode reduzir a prioridade do vídeo nem das conexões:
@@ -281,13 +282,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('info', () => ({
     hostname: os.hostname(), version: app.getVersion(), defaults: { stun: defaults.stun },
-    autostart: app.getLoginItemSettings().openAtLogin,
+    autostart: autostart.isOn(app),
   }));
   ipcMain.handle('get-server', () => net.resolveServer(defaults));
-  ipcMain.handle('set-autostart', (_e, on) => {
-    app.setLoginItemSettings({ openAtLogin: !!on, args: ['--hidden'] });
-    return app.getLoginItemSettings().openAtLogin;
-  });
+  ipcMain.handle('set-autostart', (_e, on) => autostart.set(app, on));
   ipcMain.on('attention', () => {
     showWindow();
     win?.flashFrame(true);
