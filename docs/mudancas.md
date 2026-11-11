@@ -2,6 +2,19 @@
 
 Mais recente primeiro. Os instaladores e as notas de cada versão ficam em [Releases](https://github.com/PedrooLucca/rea-desk/releases).
 
+## 0.9.0
+
+- **Novo gerenciador de arquivos:** a transferência de arquivos agora é feita **só por quem controla**. O botão **Transferir arquivos** da barra abre uma janela dividida **meio a meio**:
+  à esquerda você navega pelas pastas do **seu** computador e, à direita, pelas do **computador controlado**. Na metade esquerda há o botão **Enviar** (leva o arquivo escolhido para a
+  pasta aberta à direita) e na direita o botão **Receber** (traz o arquivo escolhido para a pasta aberta à esquerda). Com barra de andamento, **Cancelar**, arquivos de até 4 GB, sem
+  sobrescrever (um arquivo com o mesmo nome vira `nome (1).ext`) e com a lista do destino atualizada no fim.
+- **Atenção, a permissão "Arquivos e textos" ficou mais ampla:** agora ela deixa quem controla **ver as pastas e copiar arquivos** do computador controlado (o que a conta do Windows dele
+  alcançar). O pedido de acesso diz isso. **Computadores de confiança** lembrados com "Arquivos e textos" passam a ter esse alcance: confira a lista em **Configurações → Computadores de
+  confiança**. A tela do computador controlado mostra um aviso quando o gerenciador é usado.
+- O computador controlado **não tem mais** botão de enviar arquivo nem a pergunta "Deseja receber?", e a pasta `Downloads\REA-Desk-Recebidos` deixou de ser usada. Atualize **os dois** computadores:
+  uma versão antiga não entende o gerenciador.
+- Os testes automáticos passam a conferir o acesso ao disco do gerenciador (nomes, não sobrescrever, cancelar, limites).
+
 ## 0.8.1
 
 - **Abrir junto com o Windows voltou a funcionar:** a caixa em **Configurações** aparecia sempre desmarcada, mesmo com o programa registrado para abrir com o Windows, e ao

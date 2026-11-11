@@ -35,6 +35,7 @@
 | `scripts/test-history.js` | Histórico de computadores acessados |
 | `scripts/test-viewmode.js` | Cálculo do tamanho da imagem (reduzida / esticada) |
 | `scripts/test-contrast.js` | Contraste das cores do design system (`ui/app.css`) nos temas escuro e claro |
+| `scripts/test-files.js` | Gerenciador de arquivos: listar, ler e gravar no disco (pastas temporárias: nomes, não sobrescrever, cancelar, limites) e a lógica pura (`fmcore.js`) |
 
 O repositório não tem testes automatizados da interface; a conexão completa foi verificada à mão e com scripts descartáveis.
 

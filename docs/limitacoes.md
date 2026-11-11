@@ -25,7 +25,7 @@
   Se o outro computador usa essa combinação para algo, os atalhos ficam indisponíveis para o programa que a usa.
 - **Contraste da interface:** textos, ícones e o foco passam no nível AA (conferido por `npm test`); as bordas dos campos são discretas (cerca
   de 1,6:1), abaixo dos 3:1 que o WCAG pede para o contorno de componentes.
-- **Área de transferência automática:** só **texto** (imagens e arquivos copiados não são sincronizados; use **Enviar arquivo**). Cabe em uma
+- **Área de transferência automática:** só **texto** (imagens e arquivos copiados não são sincronizados; use o gerenciador de arquivos, **Transferir arquivos**). Cabe em uma
   mensagem do canal de dados: textos acima de cerca de 250 KB não são enviados e o programa avisa. **Não há botão de pausa**: tudo o que é copiado
   durante o acesso vai para o outro computador, **inclusive senhas**. Quem é acessado pode desligar negando **Arquivos e textos**; quem controla
   deve evitar copiar algo sigiloso durante o acesso. O programa olha a área de transferência a cada ~0,6 s, então uma cópia seguida de colar muito
@@ -40,7 +40,18 @@
   mais a deste programa enquanto o foco estiver na imagem.
 - **Antivírus:** o gancho de teclado do Windows é o mesmo mecanismo usado por programas espiões; alguns antivírus podem desconfiar. O programa só o liga com o foco na
   imagem do outro computador, não guarda nem registra o que é digitado e o desliga ao sair da imagem.
-- **Receber arquivo:** a pergunta "Deseja receber?" ainda usa a janela padrão do navegador (trocá-la exigiria mudar o recebimento do arquivo).
+- **Gerenciador de arquivos:** só **quem controla** transfere (o computador controlado não tem botões). Um arquivo por vez; **pastas inteiras não** são transferidas (só navegadas);
+  limite de **4 GB** por arquivo; só arquivos (não atalhos especiais, dispositivos nem fluxos alternativos do NTFS). Listas com mais de ~1500 itens (ou grandes demais para uma mensagem)
+  aparecem cortadas, com um aviso: digite o caminho de uma subpasta na barra para ir direto a ela. A lista mostra nome, tamanho e data, sem ícones por tipo de arquivo e sem ordenar
+  por outras colunas. Não existe apagar, renomear nem criar pasta. Arquivos em uso por outro programa, de pastas protegidas do Windows e de unidades de rede paradas podem não abrir (o
+  programa avisa o motivo). Quando a conexão cai no meio, o arquivo que chegava é apagado (não há "continuar de onde parou"). O envio antigo (uma pergunta "Deseja receber?" por arquivo,
+  pasta `Downloads\REA-Desk-Recebidos`) **foi removido**, e um computador com versão antiga **não** entende o gerenciador: atualize os dois.
+- **Alcance da permissão "Arquivos e textos":** ao marcá-la, o dono do computador controlado deixa quem controla **ver qualquer pasta e arquivo que a conta do Windows dele alcance e copiar
+  arquivos daqui e para cá** (inclusive para pastas de programas e de inicialização, se a conta puder gravar nelas), além da área de transferência. Antes da 0.9.0 essa permissão só
+  deixava enviar um arquivo por vez, com uma pergunta, para uma pasta fixa. Por isso: **computadores de confiança** que foram lembrados com "Arquivos e textos" (inclusive de versões
+  antigas) passam a entrar com esse alcance maior sem perguntar: confira a lista em **Configurações → Computadores de confiança** e remova o que não for mais adequado (não há como
+  ajustar só a permissão de arquivos de um item). Enquanto o gerenciador é usado, a tela do computador controlado mostra um aviso e a conversa registra cada arquivo copiado; o
+  controlado pode **Encerrar acesso agora** a qualquer momento. O gerenciador **não** dá acesso a programas de administrador nem a arquivos que a conta do Windows não alcance.
 - **Histórico:** guarda o código do outro computador; se ele ganhar um código novo (reinstalação), o item antigo precisa ser removido.
 
 ## O que foi testado

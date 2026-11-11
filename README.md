@@ -7,7 +7,7 @@ o digita e a outra pessoa clica em **Permitir**. Instala com dois cliques e não
 
 - Conexão por código de 9 dígitos, com aceite a cada pedido e permissões escolhidas por quem é acessado
 - Tela, mouse e teclado em tempo real, direto entre os dois computadores (WebRTC, criptografado)
-- Copiar texto, enviar arquivos (até 200 MB) e conversa
+- Copiar texto, gerenciador de arquivos em duas metades (enviar e receber, até 4 GB por arquivo) e conversa
 - Vários monitores: trocar de monitor sem reconectar e abrir outro monitor em uma segunda janela
 - Exibição reduzida (tamanho real) ou esticada, com ajuste automático da janela ao conectar
 - Histórico de computadores acessados, para reconectar com um clique

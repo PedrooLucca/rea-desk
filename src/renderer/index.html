@@ -82,6 +82,7 @@
           <p class="lead">Por <b id="hostPeer"></b>.</p>
           <p class="sub">Você pode fechar esta janela: o acesso continua. Para parar a qualquer momento, clique no botão abaixo.</p>
           <p id="autoNote" class="sub" hidden>Este acesso foi permitido automaticamente porque este computador é de confiança. Para mudar isso, remova-o em Configurações.</p>
+          <p id="fsNote" class="sub" hidden>Quem está acessando está usando o <b>gerenciador de arquivos</b>: pode ver as pastas deste computador e copiar arquivos daqui e para cá, porque você permitiu <b>Arquivos e textos</b>.</p>
           <p id="monNote" class="sub" hidden>Quem está acessando está vendo o(s) <b>monitor(es) <span id="monNum"></span></b> deste computador.</p>
           <p id="cursorNote" class="sub" hidden>O ponteiro do mouse deste computador foi escondido a pedido de quem está acessando.
             <button id="btnCursorShow" class="ghost" type="button">Mostrar meu mouse</button></p>
@@ -113,12 +114,10 @@
           <span id="monPick" class="monpick" hidden></span>
           <button id="btnPopout" class="dock-btn" type="button" hidden title="Abre outra janela mostrando outro monitor do computador que você está acessando"><i data-lucide="external-link"></i><span class="lbl">Outro monitor em nova janela</span></button>
           <button id="btnRefresh" class="dock-btn" type="button" title="Atualizar imagem: use se a imagem do outro computador parar de se mexer"><i data-lucide="refresh-cw"></i><span class="lbl">Atualizar imagem</span></button>
-          <button id="btnFile" class="dock-btn" type="button" title="Enviar arquivo"><i data-lucide="paperclip"></i><span class="lbl">Enviar arquivo</span></button>
+          <button id="btnFile" class="dock-btn" type="button" title="Transferir arquivos entre os dois computadores" hidden><i data-lucide="arrow-left-right"></i><span class="lbl">Transferir arquivos</span></button>
           <button id="btnView" class="dock-btn" type="button" aria-pressed="true"><i data-lucide="minimize-2" class="ic-shrink"></i><i data-lucide="maximize-2" class="ic-stretch"></i><span class="lbl">Exibição: reduzida</span></button>
           <button id="btnChat" class="dock-btn" type="button" aria-pressed="true" title="Esconde ou mostra a conversa (Ctrl+Alt+Shift+C)"><i data-lucide="message-square"></i><span id="chatBtnText" class="lbl">Ocultar conversa</span><span id="chatBadge" class="badge" hidden></span></button>
-          <button id="btnKeys" class="dock-btn" type="button" aria-expanded="false" title="Atalhos do teclado (Ctrl+Alt+Shift+K)"><i data-lucide="keyboard"></i><span class="lbl">Atalhos</span></button>
-          <input id="fileInput" type="file" hidden>
-        </div>
+          <button id="btnKeys" class="dock-btn" type="button" aria-expanded="false" title="Atalhos do teclado (Ctrl+Alt+Shift+K)"><i data-lucide="keyboard"></i><span class="lbl">Atalhos</span></button>        </div>
         <button id="btnEnd" class="danger dock-end" type="button" title="Encerrar acesso"><i data-lucide="power"></i><span>Encerrar</span></button>
         <button id="btnDock" class="dock-toggle" type="button" aria-expanded="true" title="Recolher a barra (Ctrl+Alt+Shift+B)"><i data-lucide="chevron-up"></i><span class="lbl">Recolher barra</span></button>
       </div>
@@ -154,7 +153,7 @@
       <div class="callout warn"><i data-lucide="triangle-alert"></i><p>Só permita se você conhece essa pessoa e pediu ajuda a ela. Desconfie de ligações ou mensagens pedindo para você instalar ou aceitar isto.</p></div>
       <div class="setgroup">
         <label class="chk"><input type="checkbox" id="permCtl" checked><span><b>Mouse e teclado</b><small>Deixar a pessoa usar meu mouse e teclado.</small></span></label>
-        <label class="chk"><input type="checkbox" id="permFiles" checked><span><b>Arquivos e textos</b><small>Deixar a pessoa enviar arquivos e compartilhar a área de transferência (o que cada um copiar pode ser colado no outro).</small></span></label>
+        <label class="chk"><input type="checkbox" id="permFiles" checked><span><b>Arquivos e textos</b><small>Deixar a pessoa ver as pastas e os arquivos deste computador e copiar arquivos daqui e para cá (gerenciador de arquivos), e compartilhar a área de transferência (o que cada um copiar pode ser colado no outro).</small></span></label>
         <label class="chk" id="rememberRow"><input type="checkbox" id="permRemember"><span><b>Lembrar este computador</b><small>Nas próximas vezes ele entra sem pedir a sua permissão, com estas mesmas escolhas. Você pode remover depois em Configurações.</small></span></label>
       </div>
     </div>
@@ -223,6 +222,40 @@
   </div>
 </div>
 
+<div id="fm" class="modal" role="dialog" aria-modal="true" aria-labelledby="fmTitle" hidden>
+  <div class="dialog fm">
+    <div class="fm-head">
+      <div><h3 id="fmTitle">Transferir arquivos</h3><p id="fmSub"><b>Enviar</b> leva o arquivo escolhido à esquerda para a pasta aberta à direita; <b>Receber</b> traz o arquivo escolhido à direita para a pasta aberta à esquerda.</p></div>
+      <button id="fmClose" class="ghost fm-close" type="button" title="Fechar (Esc)" aria-label="Fechar"><i data-lucide="x"></i></button>
+    </div>
+    <div class="fm-panes">
+      <section id="fmL" class="fm-pane" aria-label="Este computador">
+        <div class="fm-phead"><b>Este computador</b><small>quem controla</small></div>
+        <div class="fm-bar">
+          <button class="ghost" data-act="home" type="button" title="Início (pastas e discos)" aria-label="Início"><i data-lucide="house"></i></button>
+          <button class="ghost" data-act="up" type="button" title="Subir uma pasta" aria-label="Subir uma pasta"><i data-lucide="arrow-up"></i></button>
+          <button class="ghost" data-act="refresh" type="button" title="Atualizar a lista" aria-label="Atualizar a lista"><i data-lucide="refresh-cw"></i></button>
+          <input class="fm-path" spellcheck="false" autocomplete="off" aria-label="Pasta aberta neste computador" placeholder="Início">
+        </div>
+        <div class="fm-list" role="listbox" tabindex="0" aria-label="Arquivos deste computador"></div>
+        <div class="fm-foot"><span class="fm-sel"></span><button class="fm-act" id="fmSend" type="button" disabled><i data-lucide="upload"></i>Enviar</button></div>
+      </section>
+      <section id="fmR" class="fm-pane" aria-label="Computador controlado">
+        <div class="fm-phead"><b class="fm-name">Computador controlado</b><small>sendo controlado</small></div>
+        <div class="fm-bar">
+          <button class="ghost" data-act="home" type="button" title="Início (pastas e discos)" aria-label="Início"><i data-lucide="house"></i></button>
+          <button class="ghost" data-act="up" type="button" title="Subir uma pasta" aria-label="Subir uma pasta"><i data-lucide="arrow-up"></i></button>
+          <button class="ghost" data-act="refresh" type="button" title="Atualizar a lista" aria-label="Atualizar a lista"><i data-lucide="refresh-cw"></i></button>
+          <input class="fm-path" spellcheck="false" autocomplete="off" aria-label="Pasta aberta no computador controlado" placeholder="Início">
+        </div>
+        <div class="fm-list" role="listbox" tabindex="0" aria-label="Arquivos do computador controlado"></div>
+        <div class="fm-foot"><span class="fm-sel"></span><button class="fm-act" id="fmRecv" type="button" disabled><i data-lucide="download"></i>Receber</button></div>
+      </section>
+    </div>
+    <div class="fm-status" role="status" aria-live="polite"><p id="fmMsg"></p><progress id="fmProg" max="100" value="0" hidden></progress><button id="fmCancel" class="ghost" type="button" hidden>Cancelar</button></div>
+  </div>
+</div>
+
 <div id="confirm" class="modal" role="alertdialog" aria-modal="true" aria-labelledby="cfTitle" hidden>
   <div class="dialog">
     <div class="dialog-head">
@@ -239,6 +272,8 @@
 <script src="history.js"></script>
 <script src="trust.js"></script>
 <script src="viewmode.js"></script>
+<script src="fmcore.js"></script>
 <script src="renderer.js"></script>
+<script src="filemgr.js"></script>
 </body>
 </html>

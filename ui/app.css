@@ -14,6 +14,7 @@
 @import "./states.css";
 @import "./session.css";
 @import "./dialog.css";
+@import "./files.css";
 @import "./viewwin.css";
 
 /* ---------- Fonte (Inter, empacotada localmente; nada vem de CDN) ---------- */

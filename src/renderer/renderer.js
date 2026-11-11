@@ -1,7 +1,5 @@
 'use strict';
 const $ = (s) => document.querySelector(s);
-const CHUNK = 16 * 1024;
-const MAX_FILE = 200 * 1024 * 1024;
 
 const store = {
   get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
@@ -25,11 +23,9 @@ let pc, dc, localStream, pendingIce = [], hasRemote = false;
 let callTimer, videoTimer, dropTimer;
 let perms = { control: false, files: false };
 let incoming = null;    // { from, name } enquanto o diálogo está aberto
-let rx = null;          // arquivo sendo recebido
 
 const fmtId = (id) => (id || '---').replace(/(\d{3})(?=\d)/g, '$1 ');
 const digits = (s) => String(s).replace(/\D/g, '');
-const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
 const who = () => peerName || 'A outra pessoa';
 
 // kind: '' (informação), 'ok' (deu certo) ou 'error' (algo falhou): muda só a aparência.
@@ -235,9 +231,9 @@ async function onRtc(d) {
 function setupDC() {
   dc.binaryType = 'arraybuffer';
   dc.bufferedAmountLowThreshold = 1 << 20;
-  dc.onopen = () => { log('Conexão segura estabelecida.', 'sys'); if (role === 'host') { hostSendMonitors(); dsend({ k: 'clipsync', ok: !!perms.files }); onChannelOpenTrust(); } };
+  dc.onopen = () => { log('Conexão segura estabelecida.', 'sys'); if (role === 'host') { hostSendMonitors(); dsend({ k: 'clipsync', ok: !!perms.files, fs: true }); onChannelOpenTrust(); } };
   dc.onmessage = (e) => {
-    if (typeof e.data !== 'string') return onFileChunk(e.data);
+    if (typeof e.data !== 'string') return FM.onBinary(e.data);          // pedaço de arquivo do gerenciador de arquivos
     let m; try { m = JSON.parse(e.data); } catch { return; }
     onDC(m);
   };
@@ -276,7 +272,10 @@ async function onDC(m) {
       break;
     case 'trust': case 'trustok': case 'auth': case 'authok': onTrustDC(m).catch(() => {}); break;
     case 'clipsync':                                      // o computador controlado diz se a área de transferência é compartilhada
-      if (role === 'controller') clipPeerAllowed = m.ok !== false;
+      if (role === 'controller') { clipPeerAllowed = m.ok !== false; FM.setPeer(m.fs === true); }   // fs: o host tem o gerenciador de arquivos
+      break;
+    case 'fsls': case 'fsget': case 'fsput': case 'fsend': case 'fsdone': case 'fscancel':   // gerenciador de arquivos (src/renderer/filemgr.js)
+      FM.handle(m);
       break;
     case 'clip':
       if (m.auto) { await clipApply(m.text); break; }       // cópia automática: sem aviso, só coloca na área de transferência
@@ -290,48 +289,8 @@ async function onDC(m) {
     case 'clipreq':
       if (role === 'host' && perms.files) dsend({ k: 'clip', text: await window.rea.readClipboard() });
       break;
-    case 'file':
-      if (role === 'host' && !perms.files) return;
-      if (!Number.isFinite(m.size) || m.size < 0 || m.size > MAX_FILE) return;
-      if (confirm(`${who()} quer enviar o arquivo "${String(m.name).slice(0, 120)}" (${fmtSize(m.size)}).\n\nDeseja receber?`)) {
-        rx = { name: String(m.name), size: m.size, got: 0, parts: [] };
-      } else { rx = null; }
-      break;
-    case 'fileend':
-      if (rx) {
-        const total = rx.parts.reduce((n, p) => n + p.byteLength, 0);
-        const buf = new Uint8Array(total); let o = 0;
-        for (const p of rx.parts) { buf.set(new Uint8Array(p), o); o += p.byteLength; }
-        await window.rea.saveFile(rx.name, buf);
-        log(`Arquivo recebido: ${rx.name}`, 'sys');
-        toastOk('Arquivo salvo na pasta Downloads, dentro de "REA-Desk-Recebidos".');
-        rx = null;
-      }
-      break;
+    // 'file' e 'fileend' (envio antigo, uma pergunta por arquivo) deixaram de existir: a transferência agora é só pelo gerenciador de arquivos.
   }
-}
-function onFileChunk(buf) {
-  if (!rx) return;
-  rx.got += buf.byteLength;
-  if (rx.got > rx.size) { rx = null; return; }
-  rx.parts.push(buf);
-}
-
-async function sendFile(file) {
-  if (!dc || dc.readyState !== 'open') return toastErr('Ainda não há conexão com o outro computador.');
-  if (role === 'host' && !perms.files) return;
-  if (file.size > MAX_FILE) return toastErr('Este arquivo é muito grande (o limite é 200 MB).');
-  dsend({ k: 'file', name: file.name, size: file.size });
-  log(`Enviando "${file.name}"…`, 'sys');
-  for (let off = 0; off < file.size; off += CHUNK) {
-    if (!dc || dc.readyState !== 'open') return toastErr('O envio foi interrompido porque a conexão caiu.');
-    if (dc.bufferedAmount > (4 << 20)) {
-      await new Promise((r) => { dc.onbufferedamountlow = () => { dc.onbufferedamountlow = null; r(); }; });
-    }
-    dc.send(await file.slice(off, off + CHUNK).arrayBuffer());
-  }
-  dsend({ k: 'fileend' });
-  log(`Arquivo enviado: "${file.name}"`, 'sys');
 }
 
 /* ---------- Sessão ---------- */
@@ -344,7 +303,7 @@ function showSession(waiting) {
   $('#waiting').hidden = host || !waiting;
   $('#ctlWrap').hidden = host; $('#btnRefresh').hidden = host; $('#curWrap').hidden = host;
   $('#btnView').hidden = host;
-  $('#btnFile').hidden = host && !perms.files;
+  $('#btnFile').hidden = host;                                  // só quem controla transfere arquivos (gerenciador de arquivos)
   $('#btnEnd').hidden = false;
   $('#linkQ').hidden = host;
   $('#remote').hidden = host;
@@ -377,7 +336,8 @@ function reset() {
   extraView?.stream.getTracks().forEach((t) => t.stop());
   closeViewWindow();
   $('#remote').srcObject = null;
-  pc = dc = localStream = null; peerId = role = null; peerName = ''; rx = null;
+  pc = dc = localStream = null; peerId = role = null; peerName = '';
+  FM.reset();                                                  // fecha o gerenciador de arquivos e apaga transferências pela metade
   extraView = null; primaryStreamId = null; pendingReneg = false; viewsInfo = null; streamById.clear();
   monState = { list: [], selected: null, rev: 0 }; viewMon = null; pendingSelect = null;
   $('#btnPopout').hidden = true;
@@ -1010,7 +970,7 @@ for (const m of document.querySelectorAll('.modal')) {
     }
   }).observe(m, { attributes: true, attributeFilter: ['hidden'] });
 }
-const MODAL_ESC = { incoming: '#inDeny', settings: '#cfgCancel', confirm: '#cfNo' };   // Esc aciona este botão (boas-vindas não fecha)
+const MODAL_ESC = { incoming: '#inDeny', settings: '#cfgCancel', confirm: '#cfNo', fm: '#fmClose' };   // Esc aciona este botão (boas-vindas não fecha)
 document.addEventListener('keydown', (e) => {
   const open = [...document.querySelectorAll('.modal')].filter((m) => !m.hidden).pop();
   if (!open) return;
@@ -1100,8 +1060,7 @@ function acceptAutomatically(inc, entry) {
 }
 function grantPerms(p) {                                        // libera o que foi combinado (depois da prova do canal)
   perms = { control: !!p.control, files: !!p.files };
-  $('#btnFile').hidden = !perms.files;
-  dsend({ k: 'clipsync', ok: !!perms.files });
+  dsend({ k: 'clipsync', ok: !!perms.files, fs: true });
 }
 function failAuth() {
   if (!chanAuth) return;
@@ -1277,8 +1236,6 @@ $('#inDeny').onclick = () => {
 $('#btnEnd').onclick = () => endSession(true);
 $('#btnEndHost').onclick = () => endSession(true);
 window.rea.onEndRequest(() => endSession(true));
-$('#btnFile').onclick = () => $('#fileInput').click();
-$('#fileInput').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) sendFile(f); };
 $('#btnRefresh').onclick = () => { requestRefresh(); toast('Atualizando a imagem…', 2000); };
 $('#chatForm').onsubmit = (e) => {
   e.preventDefault();

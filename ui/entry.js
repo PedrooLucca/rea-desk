@@ -5,6 +5,7 @@ import {
   ShieldAlert, Info, TriangleAlert, LoaderCircle, Wifi, WifiOff,
   MousePointerClick, MousePointer2, ExternalLink, RefreshCw, Paperclip, Minimize2, Maximize2,
   MessageSquare, Keyboard, ChevronUp, ChevronDown, Power,
+  Folder, File, HardDrive, ArrowUp, Upload, Download, House, ArrowLeftRight,
 } from 'lucide';
 import { animate } from 'motion';
 
@@ -12,6 +13,7 @@ const icons = {
   X, Copy, Check, Settings, Sun, Moon, Monitor, Star, Pencil, Trash2, ArrowRight, Clock, Laptop, ShieldCheck, ShieldAlert, Info, TriangleAlert, LoaderCircle, Wifi, WifiOff,
   MousePointerClick, MousePointer2, ExternalLink, RefreshCw, Paperclip, Minimize2, Maximize2,
   MessageSquare, Keyboard, ChevronUp, ChevronDown, Power,
+  Folder, File, HardDrive, ArrowUp, Upload, Download, House, ArrowLeftRight,
 };
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;

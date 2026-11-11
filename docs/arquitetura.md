@@ -60,8 +60,9 @@ A interface é HTML e JS puros (sem framework). O visual vem de arquivos gerados
 | `view` | controlador → host | Janela extra: `op` = `open`, `set` ou `close` |
 | `chat` | os dois | Mensagem de conversa |
 | `clip`, `clipreq` | os dois | `clip` com `auto: true` é a cópia automática (veja abaixo). Sem `auto` e `clipreq` eram dos botões manuais, que foram removidos; continuam aceitos para versões antigas |
-| `clipsync` | host → controlador | `ok`: o computador controlado permitiu arquivos e textos (se não, o controlador nem envia a cópia automática) |
-| `file`, `fileend` | os dois | Início e fim de um arquivo; os pedaços (16 KB) vão em mensagens binárias, limite de 200 MB |
+| `clipsync` | host → controlador | `ok`: o computador controlado permitiu arquivos e textos (se não, o controlador nem envia a cópia automática e o gerenciador de arquivos não abre); `fs: true`: este host tem o gerenciador de arquivos (versão nova) |
+| `fsls`, `fsget`, `fsput`, `fsend`, `fsdone`, `fscancel` | controlador → host (pedidos), host → controlador (respostas) | Gerenciador de arquivos, com `id` por pedido (veja "Gerenciador de arquivos"). Os pedaços do arquivo vão em mensagens **binárias** `[id 4 bytes][até 64 KB]`, nos dois sentidos |
+| `file`, `fileend` | (removidas) | Envio antigo, com uma pergunta por arquivo, que existia nos dois sentidos até a 0.8.x; versões novas as ignoram |
 
 Mensagens desconhecidas são ignoradas, então versões diferentes continuam funcionando (por exemplo, o botão de segunda janela só aparece se o
 host mandar `views`; sem `mon`, o mouse vai para o monitor selecionado).
@@ -72,6 +73,19 @@ Cada lado lê a própria área de transferência a cada ~0,6 s (`clipPoll` em `r
 mudou, envia `{k:'clip', text, auto:true}`. Quem recebe grava na sua (`clip-write`) e guarda o texto em `clipLast`, que impede o eco de voltar;
 um contador (`clipEpoch`) descarta leituras que ficaram velhas durante a gravação. A primeira leitura da sessão só marca o que já estava copiado.
 O host só participa com `perms.files` e avisa o controlador por `clipsync`; nenhum canal IPC novo.
+
+## Gerenciador de arquivos
+
+- **Disco** (`src/files.js`, processo principal; IPC `fs-list`, `fs-read-open`/`fs-read`/`fs-read-close`, `fs-write-open`/`fs-write`/`fs-write-close`, `fs-close-all`; todas respondem
+  `{ ok:true, ... }` ou `{ ok:false, err:'codigo' }`): lista pastas (`''` = Início: pastas conhecidas e discos; pastas primeiro; no máximo 1500 itens), lê em blocos de 256 KB e grava em
+  `nome.rea-part` com `wx` (nunca sobrescreve), renomeando só ao conferir o tamanho combinado. O nome recebido vira só o nome do arquivo (`safeName`: sem pastas, sem caracteres e nomes
+  reservados do Windows). Nada é gravado além do tamanho anunciado; limite de 4 GB. `closeAll` (fim da sessão e `before-quit`) apaga o que ficou pela metade.
+- **Janela e protocolo** (`src/renderer/filemgr.js`, lógica pura em `fmcore.js`): só **quem controla** tem janela e botões. O computador controlado só responde, e **só se `perms.files`** (a
+  conferência está no início de `hostHandle`; sem permissão, todo pedido é recusado com `nao-permitido`, inclusive os forjados). As listas do lado remoto vão em `fsls` (cortadas para caber em
+  ~180 KB), `fsget` pede um arquivo (o host responde `{ok,name,size}`, manda os pedaços binários e fecha com `fsend`), `fsput` anuncia um envio (o host abre o destino e responde; o controlador
+  manda os pedaços e `fsend`; o host confere, renomeia e responde `fsdone`), `fscancel` desiste. Os pedaços respeitam a contrapressão do canal (`bufferedAmount`). Uma transferência por vez no controlador (no host,
+  até 8 abertas). Destino: **Enviar** grava na pasta aberta **na metade direita**; **Receber** grava na pasta aberta **na metade esquerda**.
+- Quem controla com um host de versão antiga (sem `fs: true` em `clipsync`) recebe um aviso para atualizar os dois computadores; o envio antigo (`file`/`fileend`) foi removido.
 
 ## Computadores de confiança
 

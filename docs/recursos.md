@@ -40,7 +40,7 @@ a escolha é lembrada.
 | **1 2 …** | Escolhe o monitor (só aparece com mais de um) |
 | Janela com seta | Abre outro monitor em uma segunda janela |
 | Setas circulares | **Atualizar imagem** |
-| Clipe | **Enviar arquivo** |
+| Setas para os dois lados | **Transferir arquivos** (gerenciador de arquivos; só aparece para quem controla) |
 | Setas | Exibição reduzida ou esticada |
 | Balão | Mostrar ou ocultar a conversa (com contador de novas mensagens) |
 | Teclado | Lista de atalhos |
@@ -68,7 +68,18 @@ abertura. Quem pediu "reduzir movimento" no Windows não vê animações (o anel
 - **Área de transferência compartilhada (automática):** durante o acesso, o que você **copiar** (Ctrl+C) em um computador pode ser **colado**
   (Ctrl+V) no outro, nos dois sentidos, sem botões e sem avisos. Só texto; o que já estava copiado antes do acesso não é enviado, só o que mudar
   depois. Quem é acessado só participa se permitiu **Arquivos e textos** no pedido de acesso (sem isso, nada é copiado em nenhum sentido).
-- **Enviar arquivo:** até 200 MB; quem recebe confirma e o arquivo vai para `Downloads\REA-Desk-Recebidos`.
+- **Transferir arquivos (gerenciador de arquivos):** feito **só por quem controla**, pelo botão **Transferir arquivos** da barra (setas para os dois lados). Abre uma janela
+  dividida **meio a meio**: na metade **esquerda** você navega pelas pastas **do seu computador**; na **direita**, pelas **do computador controlado**. Cada metade tem os botões
+  Início (pastas conhecidas e discos), Subir uma pasta e Atualizar, e uma barra de caminho onde dá para digitar uma pasta e apertar `Enter`. Duplo clique (ou `Enter`) abre uma pasta;
+  as setas do teclado movem a seleção; `Backspace` sobe uma pasta.
+  - **Enviar** (botão na metade esquerda): escolha um arquivo à esquerda e abra, à direita, a pasta onde ele deve ficar no computador controlado; clique em **Enviar**.
+  - **Receber** (botão na metade direita): escolha um arquivo à direita e abra, à esquerda, a pasta onde ele deve ficar no seu computador; clique em **Receber**.
+  - Os botões só ligam com um **arquivo** escolhido e a **pasta de destino aberta** do outro lado; a linha abaixo de cada metade explica o que falta. Há barra de andamento e **Cancelar**
+    (o que chegou até então é apagado). Terminando, a lista do destino é atualizada e o arquivo novo fica selecionado.
+  - **Nunca sobrescreve:** se já existir um arquivo com o mesmo nome, o novo vira `nome (1).ext`. O arquivo só aparece com o nome final quando chega inteiro (antes é `nome.ext.rea-part`).
+  - Limite de **4 GB** por arquivo, **um arquivo por vez**, sem pastas inteiras (veja [limitacoes.md](limitacoes.md)).
+  - Só funciona se quem é controlado permitiu **Arquivos e textos** no pedido de acesso (senão o botão avisa e nada é lido nem gravado nele). O computador controlado **não tem
+    botões**: quando o gerenciador é usado, a tela dele mostra um aviso e a conversa registra o que foi copiado.
 - **Conversa:** painel ao lado da imagem, nos dois computadores.
 
 ### Ocultar / mostrar a conversa

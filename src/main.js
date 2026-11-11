@@ -11,6 +11,7 @@ const net = require('./net');
 const updater = require('./updater');
 const monitors = require('./monitors');
 const autostart = require('./autostart');
+const files = require('./files');
 const defaults = require('../config/defaults.json');
 
 // Janela minimizada/coberta não pode reduzir a prioridade do vídeo nem das conexões:
@@ -267,17 +268,19 @@ app.whenReady().then(() => {
   ipcMain.on('input-release', () => { try { input.releaseAll(); } catch {} });
   ipcMain.handle('clip-read', async () => String((await clipboard.readText()) ?? '').slice(0, 1_000_000));
   ipcMain.handle('clip-write', async (_e, text) => { await clipboard.writeText(String(text).slice(0, 1_000_000)); return true; });
-  ipcMain.handle('save-file', (_e, name, bytes) => {
-    const dir = path.join(app.getPath('downloads'), 'REA-Desk-Recebidos');
-    fs.mkdirSync(dir, { recursive: true });
-    const safe = path.basename(String(name)).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_') || 'arquivo';
-    const ext = path.extname(safe);
-    const base = path.basename(safe, ext);
-    let dest = path.join(dir, safe);
-    for (let i = 1; fs.existsSync(dest); i++) dest = path.join(dir, `${base} (${i})${ext}`);
-    fs.writeFileSync(dest, Buffer.from(bytes));
-    return dest;
+  // Gerenciador de arquivos (src/files.js): navegar, ler e gravar. Respostas sempre { ok:true, ... } ou { ok:false, err:'codigo' }.
+  try { files.configure({ desktop: app.getPath('desktop'), documents: app.getPath('documents'), downloads: app.getPath('downloads'), pictures: app.getPath('pictures') }); } catch {}
+  const fsHandle = (name, fn) => ipcMain.handle(name, async (_e, ...a) => {
+    try { return { ok: true, ...(await fn(...a)) }; } catch (e) { return { ok: false, err: files.codeOf(e) }; }
   });
+  fsHandle('fs-list', (p) => files.list(p));
+  fsHandle('fs-read-open', (p) => files.readOpen(p));
+  fsHandle('fs-read', async (rid) => ({ data: await files.read(rid) }));
+  fsHandle('fs-read-close', (rid) => files.readClose(rid));
+  fsHandle('fs-write-open', (dir, name, size) => files.writeOpen(dir, name, size));
+  fsHandle('fs-write', async (wid, bytes) => { await files.write(wid, bytes); return {}; });
+  fsHandle('fs-write-close', (wid, commit) => files.writeClose(wid, commit === true));
+  fsHandle('fs-close-all', () => files.closeAll());
   ipcMain.handle('reveal', (_e, p) => { shell.showItemInFolder(String(p)); });
 
   ipcMain.handle('info', () => ({
@@ -313,6 +316,7 @@ app.on('before-quit', (e) => {
   quitting = true;
   try { injector?.postMessage({ k: 'release' }); } catch {}
   try { input.releaseAll(); } catch {}
+  files.closeAll().catch(() => {});                              // apaga transferências de arquivo pela metade
   restoreCursorSafely();
   net.stop();
   setTimeout(() => { try { injector?.kill(); } catch {} }, 300);
